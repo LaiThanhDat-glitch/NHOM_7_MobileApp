@@ -1,8 +1,5 @@
+```mermaid
 flowchart TB
-    %% =========================================================
-    %% CUSTOMER
-    %% =========================================================
-
     subgraph CUSTOMER["2. CUSTOMER - NGƯỜI MUA / NGUỒN CẦU"]
         direction TB
 
@@ -157,3 +154,4 @@ flowchart TB
         C17 --> C174["Xem Post"]
         C17 --> C175["Xem Product Seller"]
     end
+```
