@@ -27,6 +27,9 @@ public class CampaignViewModel extends ViewModel {
     public LiveData<List<RescueCampaign>> getSellerCampaigns() {
         return repository.observeSellerCampaigns(currentUserId());
     }
+    public LiveData<RescueCampaign> observeCampaign(String campaignId) {
+        return repository.observeCampaign(campaignId);
+    }
     public void refreshActive() { repository.refreshActiveCampaigns(action(null)); }
     public void refreshSeller() {
         String id = requireSeller(); if (id != null) repository.refreshSellerCampaigns(id, action(null));

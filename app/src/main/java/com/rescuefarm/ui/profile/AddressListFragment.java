@@ -34,6 +34,7 @@ public class AddressListFragment extends Fragment {
         viewModel = new ViewModelProvider(this, new ProfileViewModelFactory(requireContext()))
                 .get(ProfileViewModel.class);
         viewModel.getState().observe(getViewLifecycleOwner(), this::render);
+        viewModel.observeAddresses().observe(getViewLifecycleOwner(), this::renderAddresses);
         viewModel.loadAddresses();
     }
 
@@ -42,9 +43,13 @@ public class AddressListFragment extends Fragment {
             Toast.makeText(requireContext(), state.getMessage(), Toast.LENGTH_LONG).show(); return;
         }
         if (state.getStatus() != ProfileScreenState.Status.ADDRESSES) return;
+        renderAddresses(state.getAddresses());
+    }
+
+    private void renderAddresses(java.util.List<Address> addresses) {
         container.removeAllViews();
-        emptyView.setVisibility(state.getAddresses().isEmpty() ? View.VISIBLE : View.GONE);
-        for (Address address : state.getAddresses()) container.addView(createCard(address));
+        emptyView.setVisibility(addresses.isEmpty() ? View.VISIBLE : View.GONE);
+        for (Address address : addresses) container.addView(createCard(address));
     }
 
     private View createCard(Address address) {

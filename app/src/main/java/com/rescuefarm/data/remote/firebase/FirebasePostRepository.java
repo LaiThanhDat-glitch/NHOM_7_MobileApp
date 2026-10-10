@@ -8,6 +8,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.rescuefarm.data.local.dao.PostCacheDao;
 import com.rescuefarm.data.local.database.RescueFarmDatabase;
@@ -51,6 +52,23 @@ public class FirebasePostRepository implements PostRepository {
     }
     @Override public LiveData<List<Post>> observeSellerPosts(String sellerId) {
         return Transformations.map(dao.observeSellerPosts(sellerId), PostCacheMapper::posts);
+    }
+    @Override public LiveData<Post> observePost(String postId) {
+        return new LiveData<Post>() {
+            private ListenerRegistration registration;
+            @Override protected void onActive() {
+                registration = firestore.collection(POSTS).document(postId)
+                        .addSnapshotListener((snapshot, error) -> {
+                            if (error != null || snapshot == null) return;
+                            Post post = snapshot.exists() ? mapPost(snapshot) : null;
+                            postValue(post);
+                            if (post != null) cache(post);
+                        });
+            }
+            @Override protected void onInactive() {
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
     }
     @Override public void refreshFeed(boolean reset, int requestedPageSize, PageCallback callback) {
         if (!networkStatusProvider.isOnline()) {

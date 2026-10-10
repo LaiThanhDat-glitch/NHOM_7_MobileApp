@@ -49,6 +49,8 @@ public final class AdminResourceFragment extends Fragment {
         viewModel = new ViewModelProvider(this, new AdminViewModelFactory(requireContext()))
                 .get(AdminViewModel.class);
         viewModel.getState().observe(getViewLifecycleOwner(), this::render);
+        if (section != Section.ANALYTICS) viewModel.observeSection(section).observe(
+                getViewLifecycleOwner(), this::renderItems);
         view.findViewById(R.id.refreshAdminResourceButton).setOnClickListener(v -> refresh());
         refresh();
     }
@@ -63,7 +65,14 @@ public final class AdminResourceFragment extends Fragment {
         message.setText(state.getMessage());
         container.removeAllViews();
         if (section == Section.ANALYTICS) { renderAnalytics(state.getDashboard()); return; }
-        for (AdminListItem item : state.getItems()) renderItem(item);
+        renderItems(state.getItems());
+    }
+
+    private void renderItems(java.util.List<AdminListItem> items) {
+        if (section == Section.ANALYTICS) return;
+        container.removeAllViews();
+        if (items == null) return;
+        for (AdminListItem item : items) renderItem(item);
     }
 
     private void renderItem(AdminListItem item) {

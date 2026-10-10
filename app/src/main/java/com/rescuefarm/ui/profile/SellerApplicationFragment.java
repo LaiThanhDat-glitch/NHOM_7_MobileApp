@@ -6,6 +6,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -18,6 +20,7 @@ import com.rescuefarm.domain.model.SellerApplication;
 public class SellerApplicationFragment extends Fragment {
     private ProfileViewModel viewModel; private View form, submit;
     private TextView status; private TextInputEditText representative, shop, address, proof;
+    private boolean dirty, binding;
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         return inflater.inflate(R.layout.fragment_seller_application, parent, false);
@@ -30,6 +33,16 @@ public class SellerApplicationFragment extends Fragment {
         viewModel = new ViewModelProvider(this, new ProfileViewModelFactory(requireContext()))
                 .get(ProfileViewModel.class);
         viewModel.getState().observe(getViewLifecycleOwner(), this::render);
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!binding) dirty = true;
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        representative.addTextChangedListener(watcher); shop.addTextChangedListener(watcher);
+        address.addTextChangedListener(watcher); proof.addTextChangedListener(watcher);
+        viewModel.observeSellerApplication().observe(getViewLifecycleOwner(), this::renderApplication);
         submit.setOnClickListener(v -> viewModel.submitSellerApplication(text(representative), text(shop),
                 text(address), text(proof)));
         viewModel.loadSellerApplication();
@@ -39,15 +52,27 @@ public class SellerApplicationFragment extends Fragment {
             Toast.makeText(requireContext(), state.getMessage(), Toast.LENGTH_LONG).show(); return;
         }
         if (state.getStatus() != ProfileScreenState.Status.APPLICATION) return;
-        SellerApplication application = state.getApplication();
+        renderApplication(state.getApplication());
+    }
+
+    private void renderApplication(SellerApplication application) {
         boolean editable = application == null || application.getStatus() == ApplicationStatus.REJECTED;
         form.setVisibility(editable ? View.VISIBLE : View.GONE);
-        if (application == null) status.setText(R.string.application_not_submitted);
+        if (application == null) {
+            status.setText(R.string.application_not_submitted);
+            if (!dirty) {
+                binding = true;
+                representative.setText(""); shop.setText(""); address.setText(""); proof.setText("");
+                binding = false;
+            }
+        }
         else {
             status.setText(getString(R.string.application_status_format, application.getStatus().name()));
-            if (editable) {
+            if (editable && !dirty) {
+                binding = true;
                 representative.setText(application.getRepresentativeName()); shop.setText(application.getShopName());
                 address.setText(application.getAddress()); proof.setText(application.getProofImageUrl());
+                binding = false;
             }
         }
     }

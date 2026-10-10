@@ -27,6 +27,9 @@ public interface CampaignRepository {
         return new MutableLiveData<>(Collections.emptyList());
     }
     LiveData<List<RescueCampaign>> observeSellerCampaigns(String sellerId);
+    default LiveData<RescueCampaign> observeCampaign(String campaignId) {
+        return new androidx.lifecycle.MutableLiveData<>();
+    }
     void refreshActiveCampaigns(ActionCallback callback);
     default void refreshBanners(ActionCallback callback) { callback.onSuccess(); }
     void refreshSellerCampaigns(String sellerId, ActionCallback callback);
