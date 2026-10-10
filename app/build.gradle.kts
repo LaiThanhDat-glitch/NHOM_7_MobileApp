@@ -10,7 +10,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.rescuefarm"
+        applicationId = "com.example.nhom_7_mobileapp"
         minSdk = 29
         targetSdk = 37
         versionCode = 1
