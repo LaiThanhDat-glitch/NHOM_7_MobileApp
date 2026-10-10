@@ -13,8 +13,8 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class ExampleInstrumentedTest {
     @Test
-    public void applicationId_isRescueFarm() {
+    public void applicationId_matchesFirebaseAndroidApp() {
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.rescuefarm", appContext.getPackageName());
+        assertEquals("com.example.nhom_7_mobileapp", appContext.getPackageName());
     }
 }
