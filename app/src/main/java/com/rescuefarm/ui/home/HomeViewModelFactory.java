@@ -9,6 +9,7 @@ import androidx.lifecycle.SavedStateHandleSupport;
 import com.rescuefarm.data.repository.AuthRepositoryFactory;
 import com.rescuefarm.data.repository.CampaignRepositoryFactory;
 import com.rescuefarm.data.repository.ProductRepositoryFactory;
+import com.rescuefarm.data.repository.UserRepositoryFactory;
 import com.rescuefarm.service.location.LocationProviderFactory;
 
 public class HomeViewModelFactory implements ViewModelProvider.Factory {
@@ -20,7 +21,8 @@ public class HomeViewModelFactory implements ViewModelProvider.Factory {
         }
         return (T) new HomeViewModel(ProductRepositoryFactory.create(context),
                 CampaignRepositoryFactory.create(context), AuthRepositoryFactory.create(context),
-                LocationProviderFactory.create(context));
+                LocationProviderFactory.create(context), UserRepositoryFactory.create(context),
+                new androidx.lifecycle.SavedStateHandle());
     }
     @NonNull @Override public <T extends ViewModel> T create(@NonNull Class<T> modelClass,
             @NonNull CreationExtras extras) {
@@ -29,6 +31,7 @@ public class HomeViewModelFactory implements ViewModelProvider.Factory {
         }
         return (T) new HomeViewModel(ProductRepositoryFactory.create(context),
                 CampaignRepositoryFactory.create(context), AuthRepositoryFactory.create(context),
-                LocationProviderFactory.create(context), SavedStateHandleSupport.createSavedStateHandle(extras));
+                LocationProviderFactory.create(context), UserRepositoryFactory.create(context),
+                SavedStateHandleSupport.createSavedStateHandle(extras));
     }
 }

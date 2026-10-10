@@ -2,6 +2,7 @@ package com.rescuefarm.ui.home;
 
 import android.graphics.Typeface;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -20,59 +21,90 @@ public final class HomeCardRenderer {
     public HomeCardRenderer(Fragment fragment) { this.fragment = fragment; }
 
     public View banner(Banner value, View.OnClickListener listener) {
-        MaterialCardView card = card();
+        MaterialCardView card = card(18);
         LinearLayout body = body();
-        ImageView image = image(150);
+        body.setPadding(dp(8), dp(8), dp(8), dp(9));
+        ImageView image = image(84);
         if (!value.getImageUrl().isEmpty()) Glide.with(fragment).load(value.getImageUrl()).centerCrop().into(image);
-        body.addView(image); body.addView(text(value.getTitle(), 20, true));
+        body.addView(imageFrame(image, 14, 84));
+        TextView title = text(value.getTitle(), 13, true);
+        title.setMaxLines(2); title.setPadding(dp(3), dp(7), dp(3), 0);
+        body.addView(title);
         card.addView(body); card.setOnClickListener(listener); return card;
     }
 
     public View campaign(RescueCampaign value, double distance, View.OnClickListener listener) {
-        MaterialCardView card = card(); LinearLayout body = body();
-        body.addView(text(value.getTitle(), 18, true));
-        body.addView(text(value.getHighlightLabel(), 13, true));
-        body.addView(text(reason(value), 14, false));
+        MaterialCardView card = card(16); LinearLayout body = body();
+        body.setPadding(dp(10), dp(10), dp(10), dp(10));
+        TextView title = text(value.getTitle(), 14, true); title.setMaxLines(2); body.addView(title);
+        TextView badge = text(value.getHighlightLabel() + "  ·  " + value.getUrgencyLevel().name(), 10, true);
+        badge.setTextColor(fragment.getResources().getColor(value.getUrgencyLevel()
+                == com.rescuefarm.domain.enums.UrgencyLevel.CRITICAL
+                ? com.rescuefarm.R.color.rescue_critical : com.rescuefarm.R.color.rescue_primary,
+                fragment.requireContext().getTheme()));
+        badge.setPadding(0, dp(5), 0, dp(3)); body.addView(badge);
         body.addView(text(String.format(Locale.forLanguageTag("vi-VN"),
-                "Tiến độ %.0f%% • %.1f / %.1f", value.calculateProgress(),
-                value.getRescuedQuantity(), value.getTargetQuantity()), 14, false));
+                "%.0f / %.0f %s", value.getRescuedQuantity(), value.getTargetQuantity(),
+                value.getRescueMode().name().equals("MOBILE_POINT") ? "di động" : "cố định"), 11, false));
         if (Double.isFinite(distance)) body.addView(text(String.format(Locale.forLanguageTag("vi-VN"),
-                "Cách bạn %.1f km", distance), 14, true));
+                "Cách bạn %.1f km", distance), 11, false));
         card.addView(body); card.setOnClickListener(listener); return card;
     }
 
     public View product(Product value, View.OnClickListener listener) {
-        MaterialCardView card = card(); LinearLayout row = body(); row.setOrientation(LinearLayout.HORIZONTAL);
-        ImageView image = image(92); row.addView(image, new LinearLayout.LayoutParams(dp(92), dp(92)));
+        MaterialCardView card = card(16); LinearLayout row = body();
+        row.setPadding(dp(8), dp(8), dp(8), dp(9));
+        ImageView image = image(82);
         if (!value.getImageUrls().isEmpty()) Glide.with(fragment).load(value.getImageUrls().get(0)).centerCrop().into(image);
-        LinearLayout details = new LinearLayout(fragment.requireContext()); details.setOrientation(LinearLayout.VERTICAL);
-        details.setPadding(dp(12), 0, 0, 0);
-        details.addView(text(value.getName(), 18, true));
-        details.addView(text("GIẢM " + Math.round(value.calculateDiscountPercent()) + "%", 13, true));
-        details.addView(text(money(value.getRescuePrice()) + " / " + value.getUnit(), 14, false));
-        details.addView(text(value.getOrigin() + " • " + value.getProvince(), 13, false));
-        row.addView(details, new LinearLayout.LayoutParams(0, -2, 1)); card.addView(row);
+        row.addView(imageFrame(image, 12, 82));
+        TextView name = text(value.getName(), 13, true); name.setMaxLines(2);
+        name.setMinLines(2); name.setPadding(dp(2), dp(7), dp(2), 0); row.addView(name);
+        TextView price = text(money(value.getRescuePrice()) + " / " + value.getUnit(), 12, true);
+        price.setTextColor(fragment.getResources().getColor(com.rescuefarm.R.color.rescue_primary,
+                fragment.requireContext().getTheme())); row.addView(price);
+        TextView discount = text("Giảm " + Math.round(value.calculateDiscountPercent()) + "%", 11, false);
+        discount.setTextColor(fragment.getResources().getColor(com.rescuefarm.R.color.rescue_critical,
+                fragment.requireContext().getTheme())); row.addView(discount);
+        card.addView(row);
         card.setOnClickListener(listener); return card;
     }
 
     public View category(Category value, View.OnClickListener listener) {
-        MaterialCardView card = card(); LinearLayout body = body();
+        MaterialCardView card = card(16); LinearLayout body = body();
+        card.setCardBackgroundColor(fragment.getResources().getColor(
+                com.rescuefarm.R.color.rescue_primary_container, fragment.requireContext().getTheme()));
+        body.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        body.setPadding(dp(8), dp(6), dp(8), dp(6));
         if (!value.getImageUrl().isEmpty()) {
-            ImageView image = image(96); body.addView(image);
+            ImageView image = image(48);
             Glide.with(fragment).load(value.getImageUrl()).centerCrop().into(image);
+            LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+            imageParams.setMarginEnd(dp(9)); body.addView(imageFrame(image, 14, 48), imageParams);
         }
-        body.addView(text(value.getName(), 17, true)); card.addView(body);
+        TextView name = text(value.getName(), 12, true);
+        name.setMaxLines(2); body.addView(name); card.addView(body);
         card.setOnClickListener(listener); return card;
     }
 
     public View message(String value) {
         TextView view = text(value, 14, false); view.setPadding(dp(4), dp(8), dp(4), dp(14)); return view;
     }
-    private MaterialCardView card() {
+    private MaterialCardView card(int radius) {
         MaterialCardView card = new MaterialCardView(fragment.requireContext());
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, 0, 0, dp(12)); card.setLayoutParams(params);
-        card.setRadius(dp(16)); card.setStrokeWidth(dp(1)); card.setCardElevation(0); return card;
+        card.setRadius(dp(radius)); card.setStrokeWidth(dp(1)); card.setStrokeColor(
+                fragment.getResources().getColor(com.rescuefarm.R.color.rescue_outline, fragment.requireContext().getTheme()));
+        card.setCardBackgroundColor(fragment.getResources().getColor(com.rescuefarm.R.color.rescue_surface,
+                fragment.requireContext().getTheme()));
+        card.setCardElevation(0); return card;
+    }
+    private MaterialCardView imageFrame(ImageView image, int radius, int height) {
+        MaterialCardView frame = new MaterialCardView(fragment.requireContext());
+        frame.setRadius(dp(radius)); frame.setStrokeWidth(0); frame.setCardElevation(0);
+        frame.setCardBackgroundColor(fragment.getResources().getColor(
+                com.rescuefarm.R.color.rescue_primary_container, fragment.requireContext().getTheme()));
+        frame.addView(image, new FrameLayout.LayoutParams(-1, dp(height)));
+        return frame;
     }
     private LinearLayout body() {
         LinearLayout body = new LinearLayout(fragment.requireContext()); body.setOrientation(LinearLayout.VERTICAL);
@@ -86,10 +118,6 @@ public final class HomeCardRenderer {
     private TextView text(String value, int size, boolean bold) {
         TextView view = new TextView(fragment.requireContext()); view.setText(value); view.setTextSize(size);
         if (bold) view.setTypeface(view.getTypeface(), Typeface.BOLD); return view;
-    }
-    private String reason(RescueCampaign value) {
-        return value.getRescueReason().name().replace('_', ' ') + " • "
-                + value.getUrgencyLevel().name() + " • " + value.getRescueMode().name().replace('_', ' ');
     }
     private String money(double value) {
         return NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(value);

@@ -3,6 +3,12 @@
     <string name="home_eyebrow">NÔNG SẢN CẦN BẠN</string>
     <string name="home_title">Cùng giải cứu\nhôm nay</string>
     <string name="home_subtitle">Khám phá những lô nông sản đang cần được tiêu thụ kịp thời.</string>
+    <string name="home_greeting_guest">Xin chào 👋, bạn</string>
+    <string name="home_greeting_format">Xin chào 👋, %1$s</string>
+    <string name="home_location_default">Chọn vị trí để xem nông sản quanh bạn</string>
+    <string name="home_location_active">Đang xem nông sản gần vị trí của bạn</string>
+    <string name="home_location_loading">Đang lấy vị trí hiện tại…</string>
+    <string name="home_search_hint">Tìm thanh long, xoài, rau Đà Lạt,…</string>
     <string name="urgent_section">Cần giải cứu gấp</string>
     <string name="mobile_section">Điểm giải cứu di động gần bạn</string>
     <string name="foundation_message">Nền tảng đã sẵn sàng. Dữ liệu thật sẽ được kết nối ở các phase tiếp theo.</string>
@@ -68,6 +74,10 @@
     <string name="firebase_setup_notice">Firebase chưa được cấu hình. Guest Mode vẫn sử dụng được.</string>
     <string name="loading_content_description">Đang xử lý</string>
     <string name="profile_title">Hồ sơ của bạn</string>
+    <string name="profile_avatar_description">Ảnh đại diện hồ sơ</string>
+    <string name="logout_action">Đăng xuất</string>
+    <string name="logout_title">Đăng xuất tài khoản?</string>
+    <string name="logout_confirmation">Bạn có chắc chắn muốn đăng xuất khỏi RescueFarm không?</string>
     <string name="profile_action">Hồ sơ</string>
     <string name="edit_profile_title">Chỉnh sửa hồ sơ</string>
     <string name="edit_profile_action">Chỉnh sửa hồ sơ</string>
