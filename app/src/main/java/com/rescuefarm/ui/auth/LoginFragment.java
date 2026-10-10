@@ -49,7 +49,7 @@ public class LoginFragment extends Fragment {
         );
         view.findViewById(R.id.registerButton).setOnClickListener(unused ->
                 NavHostFragment.findNavController(this).navigate(
-                        R.id.action_loginFragment_to_registerFragment
+                        R.id.action_loginFragment_to_registrationChoice
                 )
         );
         view.findViewById(R.id.forgotPasswordButton).setOnClickListener(unused ->

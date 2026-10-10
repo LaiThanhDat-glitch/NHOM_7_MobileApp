@@ -12,6 +12,7 @@ import com.google.firebase.auth.GoogleAuthProvider;
 import com.rescuefarm.data.repository.AuthRepository;
 import com.rescuefarm.data.repository.UserRepository;
 import com.rescuefarm.domain.enums.UserRole;
+import com.rescuefarm.domain.enums.CustomerType;
 import com.rescuefarm.domain.model.User;
 
 public class FirebaseAuthRepository implements AuthRepository {
@@ -53,12 +54,22 @@ public class FirebaseAuthRepository implements AuthRepository {
     }
 
     @Override
+    public void register(String email, String password, String fullName, String phone,
+                         UserRole role, AuthCallback callback) {
+        register(email, password, fullName, phone, role, CustomerType.INDIVIDUAL,
+                "", "", callback);
+    }
+
+    @Override
     public void register(
             String email,
             String password,
             String fullName,
             String phone,
             UserRole role,
+            CustomerType customerType,
+            String companyName,
+            String taxCode,
             AuthCallback callback
     ) {
         if (role != UserRole.CUSTOMER && role != UserRole.SELLER) {
@@ -72,7 +83,8 @@ public class FirebaseAuthRepository implements AuthRepository {
                         callback.onError(ErrorCode.UNKNOWN, "Firebase không trả về người dùng vừa tạo.");
                         return;
                     }
-                    createProfile(firebaseUser, fullName, phone, role, callback);
+                    createProfile(firebaseUser, fullName, phone, role, customerType,
+                            companyName, taxCode, callback);
                 })
                 .addOnFailureListener(exception -> notifyFailure(exception, callback));
     }
@@ -143,6 +155,9 @@ public class FirebaseAuthRepository implements AuthRepository {
                         displayName,
                         firebaseUser.getPhoneNumber(),
                         UserRole.CUSTOMER,
+                        CustomerType.INDIVIDUAL,
+                        "",
+                        "",
                         callback
                 );
             }
@@ -154,6 +169,9 @@ public class FirebaseAuthRepository implements AuthRepository {
             String fullName,
             String phone,
             UserRole role,
+            CustomerType customerType,
+            String companyName,
+            String taxCode,
             AuthCallback callback
     ) {
         String avatarUrl = firebaseUser.getPhotoUrl() == null
@@ -166,6 +184,9 @@ public class FirebaseAuthRepository implements AuthRepository {
                 phone,
                 avatarUrl,
                 role,
+                customerType,
+                companyName,
+                taxCode,
                 new UserRepository.UserCallback() {
                     @Override
                     public void onSuccess(User user) { callback.onSuccess(user); }

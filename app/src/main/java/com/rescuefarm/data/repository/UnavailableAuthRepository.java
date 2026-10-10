@@ -1,6 +1,7 @@
 package com.rescuefarm.data.repository;
 
 import com.rescuefarm.domain.enums.UserRole;
+import com.rescuefarm.domain.enums.CustomerType;
 
 public class UnavailableAuthRepository implements AuthRepository {
     private static final String SETUP_MESSAGE =
@@ -26,7 +27,14 @@ public class UnavailableAuthRepository implements AuthRepository {
     }
 
     @Override
-    public void register(String email, String password, String fullName, String phone, UserRole role, AuthCallback callback) {
+    public void register(String email, String password, String fullName, String phone,
+                         UserRole role, AuthCallback callback) {
+        callback.onError(ErrorCode.NOT_CONFIGURED, SETUP_MESSAGE);
+    }
+
+    @Override
+    public void register(String email, String password, String fullName, String phone, UserRole role,
+            CustomerType customerType, String companyName, String taxCode, AuthCallback callback) {
         callback.onError(ErrorCode.NOT_CONFIGURED, SETUP_MESSAGE);
     }
 

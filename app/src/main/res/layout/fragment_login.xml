@@ -3,29 +3,40 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/rescue_background"
+    android:background="@color/rescue_surface"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="@dimen/space_lg">
+        android:paddingBottom="16dp">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="170dp"
+            android:contentDescription="@string/login_banner_description"
+            android:scaleType="centerCrop"
+            android:src="@drawable/login_leaf_banner" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_xl"
-            android:text="@string/login_placeholder_title"
-            android:textAppearance="@style/TextAppearance.RescueFarm.Display"
-            android:textColor="@color/rescue_on_surface" />
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="@string/login_welcome_title"
+            android:textColor="#111111"
+            android:textSize="22sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/firebaseSetupNotice"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
+            android:layout_marginStart="32dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="32dp"
             android:background="@color/rescue_primary_container"
             android:padding="@dimen/space_md"
             android:text="@string/firebase_setup_notice"
@@ -34,27 +45,41 @@
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/emailInputLayout"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            style="@style/Widget.Material3.TextInputLayout.FilledBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_lg"
-            android:hint="@string/email_label">
+            android:layout_marginStart="32dp"
+            android:layout_marginTop="30dp"
+            android:layout_marginEnd="32dp"
+            android:elevation="2dp"
+            android:hint="@string/email_account_label"
+            app:boxBackgroundColor="@color/rescue_surface"
+            app:boxStrokeColor="@color/rescue_outline"
+            app:boxStrokeWidth="0dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/emailInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textEmailAddress"
-                android:maxLines="1" />
+                android:maxLines="1"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/passwordInputLayout"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            style="@style/Widget.Material3.TextInputLayout.FilledBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
+            android:layout_marginStart="32dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="32dp"
+            android:elevation="2dp"
             android:hint="@string/password_label"
+            app:boxBackgroundColor="@color/rescue_surface"
+            app:boxStrokeColor="@color/rescue_outline"
+            app:boxStrokeWidth="0dp"
             app:endIconMode="password_toggle">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -62,51 +87,126 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPassword"
-                android:maxLines="1" />
+                android:maxLines="1"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/forgotPasswordButton"
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
-            android:layout_height="@dimen/touch_target_min"
+            android:layout_height="40dp"
             android:layout_gravity="end"
-            android:text="@string/forgot_password_action" />
+            android:layout_marginEnd="32dp"
+            android:layout_marginTop="4dp"
+            android:text="@string/forgot_password_action"
+            android:textColor="@color/rescue_splash_text"
+            android:textSize="12sp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/loginButton"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min"
-            android:text="@string/login_action" />
+            android:layout_height="48dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:text="@string/login_action"
+            android:textColor="@color/rescue_on_primary"
+            android:textStyle="bold"
+            app:backgroundTint="@color/rescue_splash_green"
+            app:cornerRadius="26dp"
+            app:elevation="0dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="@color/rescue_outline" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:text="@string/or_separator"
+                android:textColor="@color/rescue_on_surface_variant"
+                android:textSize="12sp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="@color/rescue_outline" />
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/googleSignInButton"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min"
-            android:layout_marginTop="@dimen/space_sm"
-            android:text="@string/google_sign_in_action" />
+            android:layout_height="48dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:text="@string/google_sign_in_action"
+            android:textColor="#111111"
+            android:textStyle="bold"
+            app:cornerRadius="26dp"
+            app:icon="@drawable/ic_google_g"
+            app:iconGravity="textStart"
+            app:iconPadding="6dp"
+            app:iconTint="@null"
+            app:strokeColor="#DDE1E8"
+            app:strokeWidth="1dp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/registerButton"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min"
-            android:layout_marginTop="@dimen/space_sm"
-            android:text="@string/create_account_action" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/register_prompt"
+                android:textColor="@color/rescue_on_surface_variant"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/registerButton"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="@string/register_action_short"
+                android:textColor="#D63D3D"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/continueAsGuestButton"
-            style="@style/Widget.Material3.Button.TextButton"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min"
-            android:text="@string/continue_guest_action" />
+            android:layout_height="48dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:text="@string/continue_guest_action"
+            android:textColor="#111111"
+            android:textStyle="bold"
+            app:cornerRadius="26dp"
+            app:strokeColor="#DDE1E8"
+            app:strokeWidth="1dp" />
 
         <ProgressBar
             android:id="@+id/authProgress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
+            android:layout_marginTop="8dp"
             android:contentDescription="@string/loading_content_description"
             android:visibility="gone" />
     </LinearLayout>

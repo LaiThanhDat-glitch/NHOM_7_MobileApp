@@ -2,7 +2,33 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/main_navigation"
-    app:startDestination="@id/splashFragment">
+    app:startDestination="@id/launchLoadingFragment">
+
+    <fragment
+        android:id="@+id/launchLoadingFragment"
+        android:name="com.rescuefarm.ui.auth.LaunchLoadingFragment"
+        android:label="@string/app_name">
+        <action
+            android:id="@+id/action_launchLoading_to_splash"
+            app:destination="@id/splashFragment"
+            app:popUpTo="@id/launchLoadingFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_launchLoading_to_guestHome"
+            app:destination="@id/guestHomeFragment"
+            app:popUpTo="@id/launchLoadingFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_launchLoading_to_sellerHome"
+            app:destination="@id/sellerDashboardFragment"
+            app:popUpTo="@id/launchLoadingFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_launchLoading_to_adminHome"
+            app:destination="@id/adminDashboardFragment"
+            app:popUpTo="@id/launchLoadingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
 
     <fragment
         android:id="@+id/splashFragment"
@@ -16,6 +42,11 @@
         <action
             android:id="@+id/action_splashFragment_to_loginFragment"
             app:destination="@id/loginFragment"
+            app:popUpTo="@id/splashFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_splashFragment_to_registrationChoice"
+            app:destination="@id/registrationChoiceFragment"
             app:popUpTo="@id/splashFragment"
             app:popUpToInclusive="true" />
         <action
@@ -39,6 +70,18 @@
             app:destination="@id/guestHomeFragment"
             app:popUpTo="@id/onboardingFragment"
             app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/registrationChoiceFragment"
+        android:name="com.rescuefarm.ui.auth.RegistrationChoiceFragment"
+        android:label="@string/registration_choice_title">
+        <action
+            android:id="@+id/action_registrationChoice_to_register"
+            app:destination="@id/registerFragment" />
+        <action
+            android:id="@+id/action_registrationChoice_to_login"
+            app:destination="@id/loginFragment" />
     </fragment>
 
     <fragment
@@ -86,8 +129,8 @@
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="true" />
         <action
-            android:id="@+id/action_loginFragment_to_registerFragment"
-            app:destination="@id/registerFragment" />
+            android:id="@+id/action_loginFragment_to_registrationChoice"
+            app:destination="@id/registrationChoiceFragment" />
         <action
             android:id="@+id/action_loginFragment_to_forgotPasswordFragment"
             app:destination="@id/forgotPasswordFragment" />
@@ -97,10 +140,14 @@
         android:id="@+id/registerFragment"
         android:name="com.rescuefarm.ui.auth.RegisterFragment"
         android:label="@string/create_account_action">
+        <argument
+            android:name="role"
+            android:defaultValue="CUSTOMER"
+            app:argType="string" />
         <action
             android:id="@+id/action_registerFragment_to_guestHomeFragment"
             app:destination="@id/guestHomeFragment"
-            app:popUpTo="@id/loginFragment"
+            app:popUpTo="@id/registrationChoiceFragment"
             app:popUpToInclusive="true" />
     </fragment>
 

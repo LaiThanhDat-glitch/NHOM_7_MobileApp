@@ -1,6 +1,7 @@
 package com.rescuefarm.ui.auth;
 
 import com.rescuefarm.domain.enums.UserRole;
+import com.rescuefarm.domain.enums.CustomerType;
 
 import java.util.regex.Pattern;
 
@@ -28,6 +29,20 @@ public final class AuthValidator {
             String phone,
             UserRole role
     ) {
+        return validateRegistration(email, password, fullName, phone, role,
+                CustomerType.INDIVIDUAL, "", "");
+    }
+
+    public static String validateRegistration(
+            String email,
+            String password,
+            String fullName,
+            String phone,
+            UserRole role,
+            CustomerType customerType,
+            String companyName,
+            String taxCode
+    ) {
         if (fullName == null || fullName.trim().length() < 2) {
             return "Họ tên phải có ít nhất 2 ký tự.";
         }
@@ -42,6 +57,20 @@ public final class AuthValidator {
         }
         if (role != UserRole.CUSTOMER && role != UserRole.SELLER) {
             return "Chỉ có thể đăng ký tài khoản Customer hoặc Seller.";
+        }
+        if (role == UserRole.CUSTOMER && customerType == CustomerType.BUSINESS) {
+            if (companyName == null || companyName.trim().length() < 2) {
+                return "Vui lòng nhập tên doanh nghiệp.";
+            }
+            if (taxCode == null || taxCode.trim().isEmpty()) {
+                return "Vui lòng nhập mã số thuế.";
+            }
+            if (companyName.trim().length() > 160) {
+                return "Tên doanh nghiệp không được vượt quá 160 ký tự.";
+            }
+            if (taxCode.trim().length() > 40) {
+                return "Mã số thuế không được vượt quá 40 ký tự.";
+            }
         }
         return null;
     }

@@ -3,130 +3,272 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/rescue_background"
+    android:background="@color/rescue_surface"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="@dimen/space_lg">
+        android:paddingBottom="20dp">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="112dp"
+            android:contentDescription="@string/login_banner_description"
+            android:scaleType="centerCrop"
+            android:src="@drawable/login_leaf_banner" />
 
         <TextView
+            android:id="@+id/registerTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_lg"
-            android:text="@string/register_title"
-            android:textAppearance="@style/TextAppearance.RescueFarm.Display"
-            android:textColor="@color/rescue_on_surface" />
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="24dp"
+            android:gravity="center"
+            android:text="@string/register_customer_title"
+            android:textColor="@color/rescue_on_surface"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/customerTypeGroup"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginStart="34dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="34dp"
+            android:visibility="gone"
+            app:checkedButton="@id/individualTypeButton"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/individualTypeButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="@string/customer_type_individual"
+                android:textAllCaps="false"
+                android:textColor="@color/rescue_on_surface"
+                android:textSize="13sp"
+                app:cornerRadius="24dp"
+                app:strokeColor="@color/rescue_outline"
+                app:strokeWidth="1dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/businessTypeButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="@string/customer_type_business"
+                android:textAllCaps="false"
+                android:textColor="@color/rescue_on_surface"
+                android:textSize="13sp"
+                app:cornerRadius="24dp"
+                app:strokeColor="@color/rescue_outline"
+                app:strokeWidth="1dp" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <TextView
+            android:id="@+id/sellerRegistrationNotice"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_sm"
-            android:text="@string/register_body"
-            android:textColor="@color/rescue_on_surface_variant" />
+            android:layout_marginStart="28dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="28dp"
+            android:gravity="center"
+            android:text="@string/seller_registration_notice"
+            android:textColor="@color/rescue_on_surface_variant"
+            android:textSize="12sp"
+            android:visibility="gone" />
 
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            style="@style/Widget.Material3.TextInputLayout.FilledBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_lg"
-            android:hint="@string/full_name_label">
+            android:layout_marginStart="28dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="28dp"
+            android:elevation="2dp"
+            android:hint="@string/full_name_label"
+            app:boxBackgroundColor="@color/rescue_surface"
+            app:boxStrokeWidth="0dp">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/fullNameInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textPersonName"
-                android:maxLines="1" />
+                android:inputType="textPersonName|textCapWords"
+                android:maxLines="1"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            style="@style/Widget.Material3.TextInputLayout.FilledBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
-            android:hint="@string/email_label">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/emailInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textEmailAddress"
-                android:maxLines="1" />
-        </com.google.android.material.textfield.TextInputLayout>
+            android:layout_marginStart="28dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="28dp"
+            android:elevation="2dp"
+            android:hint="@string/phone_label"
+            app:boxBackgroundColor="@color/rescue_surface"
+            app:boxStrokeWidth="0dp">
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
-            android:hint="@string/phone_label">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/phoneInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="phone"
-                android:maxLines="1" />
+                android:maxLines="1"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            style="@style/Widget.Material3.TextInputLayout.FilledBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
+            android:layout_marginStart="28dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="28dp"
+            android:elevation="2dp"
+            android:hint="@string/email_label"
+            app:boxBackgroundColor="@color/rescue_surface"
+            app:boxStrokeWidth="0dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/emailInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textEmailAddress"
+                android:maxLines="1"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.FilledBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="28dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="28dp"
+            android:elevation="2dp"
             android:hint="@string/password_label"
+            app:boxBackgroundColor="@color/rescue_surface"
+            app:boxStrokeWidth="0dp"
             app:endIconMode="password_toggle">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/passwordInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPassword"
-                android:maxLines="1" />
+                android:maxLines="1"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <RadioGroup
-            android:id="@+id/roleGroup"
+        <LinearLayout
+            android:id="@+id/businessFields"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.FilledBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="28dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="28dp"
+                android:elevation="2dp"
+                android:hint="@string/company_name_label"
+                app:boxBackgroundColor="@color/rescue_surface"
+                app:boxStrokeWidth="0dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/companyNameInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textCapWords"
+                    android:maxLines="1"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.FilledBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="28dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="28dp"
+                android:elevation="2dp"
+                android:hint="@string/tax_code_label"
+                app:boxBackgroundColor="@color/rescue_surface"
+                app:boxStrokeWidth="0dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/taxCodeInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textCapCharacters"
+                    android:maxLength="40"
+                    android:maxLines="1"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="28dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="28dp"
+            android:gravity="center"
             android:orientation="horizontal">
 
-            <com.google.android.material.radiobutton.MaterialRadioButton
-                android:id="@+id/customerRoleButton"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/backToLoginButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="@dimen/touch_target_min"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
                 android:layout_weight="1"
-                android:checked="true"
-                android:text="@string/customer_role" />
+                android:text="@string/cancel_action"
+                android:textColor="@color/rescue_on_surface"
+                app:cornerRadius="24dp"
+                app:strokeColor="@color/rescue_outline"
+                app:strokeWidth="1dp" />
 
-            <com.google.android.material.radiobutton.MaterialRadioButton
-                android:id="@+id/sellerRoleButton"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/createAccountButton"
                 android:layout_width="0dp"
-                android:layout_height="@dimen/touch_target_min"
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                android:text="@string/seller_role" />
-        </RadioGroup>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/createAccountButton"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min"
-            android:layout_marginTop="@dimen/space_lg"
-            android:text="@string/create_account_action" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/backToLoginButton"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min"
-            android:text="@string/login_action" />
+                android:text="@string/create_account_action"
+                android:textColor="@color/rescue_on_primary"
+                android:textStyle="bold"
+                app:backgroundTint="@color/rescue_splash_green"
+                app:cornerRadius="24dp" />
+        </LinearLayout>
 
         <ProgressBar
             android:id="@+id/authProgress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="@dimen/space_md"
+            android:layout_marginTop="8dp"
             android:contentDescription="@string/loading_content_description"
             android:visibility="gone" />
     </LinearLayout>
