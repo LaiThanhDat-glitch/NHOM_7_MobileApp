@@ -1,6 +1,7 @@
 package com.rescuefarm.data.repository;
 
 import com.rescuefarm.domain.enums.UserRole;
+import com.rescuefarm.domain.enums.CustomerType;
 import com.rescuefarm.domain.model.User;
 
 public interface AuthRepository {
@@ -38,6 +39,19 @@ public interface AuthRepository {
             UserRole role,
             AuthCallback callback
     );
+    default void register(
+            String email,
+            String password,
+            String fullName,
+            String phone,
+            UserRole role,
+            CustomerType customerType,
+            String companyName,
+            String taxCode,
+            AuthCallback callback
+    ) {
+        register(email, password, fullName, phone, role, callback);
+    }
     void signInWithGoogleIdToken(String idToken, AuthCallback callback);
     void sendPasswordResetEmail(String email, ActionCallback callback);
     void signOut();

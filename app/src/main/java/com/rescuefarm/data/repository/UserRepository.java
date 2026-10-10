@@ -3,6 +3,7 @@ package com.rescuefarm.data.repository;
 import androidx.lifecycle.LiveData;
 
 import com.rescuefarm.domain.enums.UserRole;
+import com.rescuefarm.domain.enums.CustomerType;
 import com.rescuefarm.domain.model.Address;
 import com.rescuefarm.domain.model.SellerApplication;
 import com.rescuefarm.domain.model.User;
@@ -54,6 +55,9 @@ public interface UserRepository {
             String phone,
             String avatarUrl,
             UserRole role,
+            CustomerType customerType,
+            String companyName,
+            String taxCode,
             UserCallback callback
     );
     void updateProfile(

@@ -72,7 +72,8 @@ public class FirebaseUserRepository implements UserRepository {
     }
 
     @Override public void createRegistrationProfile(String userId, String email, String fullName,
-            String phone, String avatarUrl, UserRole role, UserCallback callback) {
+            String phone, String avatarUrl, UserRole role, CustomerType customerType,
+            String companyName, String taxCode, UserCallback callback) {
         Map<String, Object> profile = new HashMap<>();
         profile.put("id", userId); profile.put("email", safe(email));
         profile.put("fullName", clean(fullName)); profile.put("phone", clean(phone));
@@ -80,6 +81,12 @@ public class FirebaseUserRepository implements UserRepository {
         profile.put("status", ACTIVE_STATUS); profile.put("latitude", 0D); profile.put("longitude", 0D);
         profile.put("createdAt", FieldValue.serverTimestamp());
         profile.put("updatedAt", FieldValue.serverTimestamp());
+        if (role == UserRole.CUSTOMER) {
+            CustomerType selectedType = customerType == null ? CustomerType.INDIVIDUAL : customerType;
+            profile.put("customerType", selectedType.name());
+            profile.put("companyName", selectedType == CustomerType.BUSINESS ? clean(companyName) : "");
+            profile.put("taxCode", selectedType == CustomerType.BUSINESS ? clean(taxCode) : "");
+        }
         if (role == UserRole.SELLER) profile.put("sellerStatus", PENDING_SELLER_STATUS);
         user(userId).set(profile).addOnSuccessListener(unused -> getUser(userId, callback))
                 .addOnFailureListener(error -> notifyFailure(error, callback::onError));

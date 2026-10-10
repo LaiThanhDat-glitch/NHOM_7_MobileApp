@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel;
 import com.rescuefarm.data.repository.AuthRepository;
 import com.rescuefarm.data.repository.GuestSessionRepository;
 import com.rescuefarm.domain.enums.UserRole;
+import com.rescuefarm.domain.enums.CustomerType;
 import com.rescuefarm.domain.model.User;
 
 public class AuthViewModel extends ViewModel {
@@ -37,7 +38,7 @@ public class AuthViewModel extends ViewModel {
             screenState.setValue(AuthScreenState.onboardingRequired());
             return;
         }
-        screenState.setValue(AuthScreenState.loginRequired());
+        screenState.setValue(AuthScreenState.guest(guestSessionRepository.getOrCreateGuestId()));
     }
 
     public void completeOnboarding() {
@@ -68,12 +69,28 @@ public class AuthViewModel extends ViewModel {
             String phone,
             UserRole role
     ) {
+        register(email, password, fullName, phone, role, CustomerType.INDIVIDUAL, "", "");
+    }
+
+    public void register(
+            String email,
+            String password,
+            String fullName,
+            String phone,
+            UserRole role,
+            CustomerType customerType,
+            String companyName,
+            String taxCode
+    ) {
         String validationError = AuthValidator.validateRegistration(
                 email,
                 password,
                 fullName,
                 phone,
-                role
+                role,
+                customerType,
+                companyName,
+                taxCode
         );
         if (validationError != null) {
             screenState.setValue(AuthScreenState.error(validationError));
@@ -86,6 +103,9 @@ public class AuthViewModel extends ViewModel {
                 fullName.trim(),
                 phone.replace(" ", ""),
                 role,
+                customerType,
+                companyName == null ? "" : companyName.trim(),
+                taxCode == null ? "" : taxCode.trim(),
                 createAuthCallback()
         );
     }

@@ -32,6 +32,14 @@ public class SplashFragment extends Fragment {
         ).get(AuthViewModel.class);
 
         viewModel.getScreenState().observe(getViewLifecycleOwner(), this::routeFromState);
+        view.findViewById(R.id.splashLoginButton).setOnClickListener(unused -> {
+            viewModel.completeOnboarding();
+            NavHostFragment.findNavController(this).navigate(R.id.action_splashFragment_to_loginFragment);
+        });
+        view.findViewById(R.id.splashRegisterButton).setOnClickListener(unused -> {
+            viewModel.completeOnboarding();
+            NavHostFragment.findNavController(this).navigate(R.id.action_splashFragment_to_registrationChoice);
+        });
         AuthScreenState currentState = viewModel.getScreenState().getValue();
         if (currentState == null || currentState.getStatus() == AuthScreenState.Status.IDLE) {
             viewModel.determineLaunchRoute();
@@ -48,16 +56,14 @@ public class SplashFragment extends Fragment {
         int actionId;
         switch (state.getStatus()) {
             case ONBOARDING_REQUIRED:
-                actionId = R.id.action_splashFragment_to_onboardingFragment;
-                break;
+                return;
             case AUTHENTICATED:
             case GUEST:
                 actionId = R.id.action_splashFragment_to_guestHomeFragment;
                 break;
             case LOGIN_REQUIRED:
+                return;
             case ERROR:
-                actionId = R.id.action_splashFragment_to_loginFragment;
-                break;
             default:
                 return;
         }
