@@ -39,7 +39,10 @@ public class ForgotPasswordFragment extends Fragment {
         view.findViewById(R.id.sendResetEmailButton).setOnClickListener(unused ->
                 viewModel.sendPasswordResetEmail(textOf(emailInput))
         );
-        view.findViewById(R.id.backToLoginButton).setOnClickListener(unused ->
+        view.findViewById(R.id.cancelResetButton).setOnClickListener(unused ->
+                NavHostFragment.findNavController(this).navigateUp()
+        );
+        view.findViewById(R.id.successBackToLoginButton).setOnClickListener(unused ->
                 NavHostFragment.findNavController(this).navigateUp()
         );
         viewModel.getScreenState().observe(getViewLifecycleOwner(), state -> renderState(view, state));
@@ -49,8 +52,13 @@ public class ForgotPasswordFragment extends Fragment {
         progressBar.setVisibility(
                 state.getStatus() == AuthScreenState.Status.LOADING ? View.VISIBLE : View.GONE
         );
-        if ((state.getStatus() == AuthScreenState.Status.ERROR
-                || state.getStatus() == AuthScreenState.Status.RESET_EMAIL_SENT)
+        View requestContainer = view.findViewById(R.id.resetRequestContainer);
+        View successContainer = view.findViewById(R.id.resetSuccessContainer);
+        if (state.getStatus() == AuthScreenState.Status.RESET_EMAIL_SENT) {
+            requestContainer.setVisibility(View.GONE);
+            successContainer.setVisibility(View.VISIBLE);
+            viewModel.clearTransientState();
+        } else if (state.getStatus() == AuthScreenState.Status.ERROR
                 && state.getMessage() != null) {
             Snackbar.make(view, state.getMessage(), Snackbar.LENGTH_LONG).show();
             viewModel.clearTransientState();
