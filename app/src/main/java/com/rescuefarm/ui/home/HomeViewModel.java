@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel;
 import com.rescuefarm.data.repository.AuthRepository;
 import com.rescuefarm.data.repository.CampaignRepository;
 import com.rescuefarm.data.repository.ProductRepository;
+import com.rescuefarm.data.repository.UserRepository;
 import com.rescuefarm.domain.model.Banner;
 import com.rescuefarm.domain.model.Category;
 import com.rescuefarm.domain.model.Product;
@@ -21,6 +22,7 @@ public class HomeViewModel extends ViewModel {
     private final ProductRepository productRepository;
     private final CampaignRepository campaignRepository;
     private final AuthRepository authRepository;
+    private final UserRepository userRepository;
     private final LocationProvider locationProvider;
     private final HomeContentBuilder contentBuilder = new HomeContentBuilder();
     private final SavedStateHandle savedState;
@@ -28,6 +30,7 @@ public class HomeViewModel extends ViewModel {
     private final MediatorLiveData<HomeViewState> homeState = new MediatorLiveData<>();
     private final MutableLiveData<List<DiscoveryResult>> searchResults =
             new MutableLiveData<>(new ArrayList<>());
+    private final MutableLiveData<String> greetingName = new MutableLiveData<>("bạn");
     private List<Product> products = new ArrayList<>();
     private List<Category> categories = new ArrayList<>();
     private List<RescueCampaign> campaigns = new ArrayList<>();
@@ -45,16 +48,25 @@ public class HomeViewModel extends ViewModel {
     public HomeViewModel(ProductRepository productRepository, CampaignRepository campaignRepository,
             AuthRepository authRepository, LocationProvider locationProvider) {
         this(productRepository, campaignRepository, authRepository, locationProvider,
-                new SavedStateHandle());
+                null, new SavedStateHandle());
     }
 
     public HomeViewModel(ProductRepository productRepository, CampaignRepository campaignRepository,
             AuthRepository authRepository, LocationProvider locationProvider,
             SavedStateHandle savedState) {
+        this(productRepository, campaignRepository, authRepository, locationProvider,
+                null, savedState);
+    }
+
+    public HomeViewModel(ProductRepository productRepository, CampaignRepository campaignRepository,
+            AuthRepository authRepository, LocationProvider locationProvider,
+            UserRepository userRepository, SavedStateHandle savedState) {
         this.productRepository = productRepository; this.campaignRepository = campaignRepository;
         this.authRepository = authRepository; this.locationProvider = locationProvider;
+        this.userRepository = userRepository;
         this.savedState = savedState;
         this.query = DiscoveryQueryState.restore(savedState);
+        loadGreetingName();
         homeState.addSource(productRepository.observeProducts(), values -> {
             products = safe(values); publish();
         });
@@ -72,9 +84,22 @@ public class HomeViewModel extends ViewModel {
 
     public LiveData<HomeViewState> getHomeState() { return homeState; }
     public LiveData<List<DiscoveryResult>> getSearchResults() { return searchResults; }
+    public LiveData<String> getGreetingName() { return greetingName; }
     public List<Category> getCategoriesSnapshot() { return new ArrayList<>(categories); }
     public DiscoveryQuery getQuery() { return query; }
     public boolean isAuthenticated() { return authRepository.isAuthenticated(); }
+
+    private void loadGreetingName() {
+        String userId = authRepository.getCurrentUserId();
+        if (!authRepository.isAuthenticated() || userId == null || userRepository == null) return;
+        userRepository.getUser(userId, new UserRepository.UserCallback() {
+            @Override public void onSuccess(com.rescuefarm.domain.model.User user) {
+                String name = user == null ? null : user.getFullName();
+                if (name != null && !name.trim().isEmpty()) greetingName.postValue(name.trim());
+            }
+            @Override public void onError(UserRepository.ProfileError error, String message) { }
+        });
+    }
 
     public void refresh() {
         if (refreshing) return;

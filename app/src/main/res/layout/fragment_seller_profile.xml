@@ -6,14 +6,28 @@
         android:orientation="vertical" android:padding="@dimen/space_lg">
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="@string/seller_profile_title" android:textAppearance="@style/TextAppearance.RescueFarm.Display" />
-        <TextView android:id="@+id/sellerShopName" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_lg"
-            android:textAppearance="@style/TextAppearance.RescueFarm.SectionTitle" />
-        <TextView android:id="@+id/sellerStatus" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_sm" android:textStyle="bold" />
-        <TextView android:id="@+id/sellerBusinessRule" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_sm"
-            android:textColor="@color/rescue_on_surface_variant" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md" android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical">
+                <TextView android:id="@+id/sellerShopName" android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.RescueFarm.SectionTitle" />
+                <TextView android:id="@+id/sellerStatus" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_sm"
+                    android:textStyle="bold" />
+                <TextView android:id="@+id/sellerBusinessRule" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_sm"
+                    android:textColor="@color/rescue_on_surface_variant" />
+            </LinearLayout>
+            <ImageView android:id="@+id/sellerProfileAvatar"
+                android:layout_width="76dp" android:layout_height="76dp" android:layout_marginStart="12dp"
+                android:background="@drawable/bg_profile_avatar_circle" android:clipToOutline="true"
+                android:contentDescription="@string/profile_avatar_description"
+                android:padding="16dp" android:scaleType="centerCrop" android:src="@drawable/ic_nav_profile"
+                />
+        </LinearLayout>
         <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_lg" android:hint="@string/representative_label">
@@ -45,30 +59,44 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content" />
         </com.google.android.material.textfield.TextInputLayout>
         <com.google.android.material.button.MaterialButton android:id="@+id/saveSellerProfileButton"
-            android:layout_width="match_parent" android:layout_height="@dimen/touch_target_min"
-            android:layout_marginTop="@dimen/space_md" android:text="@string/save_seller_profile_action" />
+            style="@style/Widget.RescueFarm.ProfilePrimaryButton"
+            android:layout_width="match_parent" android:layout_height="42dp"
+            android:layout_marginStart="4dp" android:layout_marginTop="@dimen/space_md"
+            android:layout_marginEnd="4dp" android:text="@string/save_seller_profile_action" />
         <com.google.android.material.button.MaterialButton android:id="@+id/openSellerApplicationButton"
-            style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min" android:layout_marginTop="@dimen/space_sm"
+            style="@style/Widget.RescueFarm.ProfileOutlinedButton" android:layout_width="match_parent"
+            android:layout_height="42dp" android:layout_marginStart="4dp" android:layout_marginTop="@dimen/space_sm"
+            android:layout_marginEnd="4dp"
             android:text="@string/seller_application_action" />
         <com.google.android.material.button.MaterialButton android:id="@+id/openSellerDashboardButton"
-            style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min" android:text="@string/seller_dashboard_title" />
+            style="@style/Widget.RescueFarm.ProfileOutlinedButton" android:layout_width="match_parent"
+            android:layout_height="42dp" android:layout_marginStart="4dp"
+            android:layout_marginTop="@dimen/space_sm" android:layout_marginEnd="4dp"
+            android:text="@string/seller_dashboard_title" />
         <com.google.android.material.button.MaterialButton android:id="@+id/openSellerProductsButton"
-            style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min" android:layout_marginTop="@dimen/space_sm"
+            style="@style/Widget.RescueFarm.ProfileOutlinedButton" android:layout_width="match_parent"
+            android:layout_height="42dp" android:layout_marginStart="4dp" android:layout_marginTop="@dimen/space_sm"
+            android:layout_marginEnd="4dp"
             android:text="@string/seller_products_action" />
         <com.google.android.material.button.MaterialButton android:id="@+id/openSellerCampaignsButton"
-            style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min" android:layout_marginTop="@dimen/space_sm"
+            style="@style/Widget.RescueFarm.ProfileOutlinedButton" android:layout_width="match_parent"
+            android:layout_height="42dp" android:layout_marginStart="4dp" android:layout_marginTop="@dimen/space_sm"
+            android:layout_marginEnd="4dp"
             android:text="@string/seller_campaigns_action" />
         <com.google.android.material.button.MaterialButton android:id="@+id/openSellerPostsButton"
-            style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min" android:layout_marginTop="@dimen/space_sm"
+            style="@style/Widget.RescueFarm.ProfileOutlinedButton" android:layout_width="match_parent"
+            android:layout_height="42dp" android:layout_marginStart="4dp" android:layout_marginTop="@dimen/space_sm"
+            android:layout_marginEnd="4dp"
             android:text="@string/seller_posts_action" />
         <com.google.android.material.button.MaterialButton android:id="@+id/openSellerOrdersButton"
-            style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent"
-            android:layout_height="@dimen/touch_target_min" android:layout_marginTop="@dimen/space_sm"
+            style="@style/Widget.RescueFarm.ProfileOutlinedButton" android:layout_width="match_parent"
+            android:layout_height="42dp" android:layout_marginStart="4dp" android:layout_marginTop="@dimen/space_sm"
+            android:layout_marginEnd="4dp"
             android:text="@string/seller_orders_action" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/logoutButton"
+            style="@style/Widget.RescueFarm.ProfileLogoutButton" android:layout_width="match_parent"
+            android:layout_height="42dp" android:layout_marginStart="4dp"
+            android:layout_marginTop="@dimen/space_md" android:layout_marginEnd="4dp"
+            android:text="@string/logout_action" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
