@@ -23,6 +23,7 @@ public class NotchedNavigationFrameLayout extends FrameLayout {
         super(context, attrs);
         density = getResources().getDisplayMetrics().density;
         paint.setColor(ContextCompat.getColor(context, R.color.rescue_nav_surface));
+        paint.setAlpha(218);
         setWillNotDraw(false);
     }
 

@@ -9,6 +9,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.rescuefarm.data.local.dao.CampaignCacheDao;
 import com.rescuefarm.data.local.dao.BannerCacheDao;
 import com.rescuefarm.data.local.dao.CatalogCacheDao;
@@ -67,6 +68,23 @@ public class FirebaseCampaignRepository implements CampaignRepository {
     }
     @Override public LiveData<List<RescueCampaign>> observeSellerCampaigns(String sellerId) {
         return Transformations.map(campaignDao.observeSellerCampaigns(sellerId), CampaignCacheMapper::campaigns);
+    }
+    @Override public LiveData<RescueCampaign> observeCampaign(String campaignId) {
+        return new LiveData<RescueCampaign>() {
+            private ListenerRegistration registration;
+            @Override protected void onActive() {
+                registration = firestore.collection(CAMPAIGNS).document(campaignId)
+                        .addSnapshotListener((snapshot, error) -> {
+                            if (error != null || snapshot == null) return;
+                            RescueCampaign campaign = snapshot.exists() ? mapCampaign(snapshot) : null;
+                            postValue(campaign);
+                            if (campaign != null) cache(campaign);
+                        });
+            }
+            @Override protected void onInactive() {
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
     }
     @Override public LiveData<List<Banner>> observeActiveBanners() {
         return Transformations.map(bannerDao.observeActiveBanners(), BannerCacheMapper::banners);

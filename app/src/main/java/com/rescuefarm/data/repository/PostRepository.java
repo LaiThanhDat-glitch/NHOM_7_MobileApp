@@ -37,6 +37,9 @@ public interface PostRepository {
 
     LiveData<List<Post>> observePublishedPosts();
     LiveData<List<Post>> observeSellerPosts(String sellerId);
+    default LiveData<Post> observePost(String postId) {
+        return new androidx.lifecycle.MutableLiveData<>();
+    }
     void refreshFeed(boolean reset, int pageSize, PageCallback callback);
     void refreshSellerPosts(String sellerId, ActionCallback callback);
     void getPost(String postId, PostCallback callback);

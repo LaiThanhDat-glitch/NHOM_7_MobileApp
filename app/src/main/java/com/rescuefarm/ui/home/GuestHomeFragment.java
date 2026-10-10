@@ -2,7 +2,10 @@ package com.rescuefarm.ui.home;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +21,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.Navigation;
+import androidx.viewpager2.widget.ViewPager2;
 import com.rescuefarm.R;
 import com.rescuefarm.domain.model.Banner;
 import com.rescuefarm.domain.model.Category;
@@ -42,7 +46,19 @@ public class GuestHomeFragment extends Fragment {
     private TextView greeting, locationLabel;
     private ProgressBar progress;
     private TextView feedTitle;
-    private LinearLayout bannerSection, criticalSection, valueSection, campaignSection, categorySection, feedSection;
+    private ViewPager2 bannerPager;
+    private LinearLayout bannerDots, criticalSection, valueSection, campaignSection, categorySection, feedSection;
+    private BannerPagerAdapter bannerAdapter;
+    private ViewPager2.OnPageChangeCallback bannerPageCallback;
+    private final Handler bannerHandler = new Handler(Looper.getMainLooper());
+    private final Runnable bannerAutoScroll = new Runnable() {
+        @Override public void run() {
+            if (bannerAdapter != null && bannerAdapter.getItemCount() > 1 && bannerPager != null) {
+                bannerPager.setCurrentItem((bannerPager.getCurrentItem() + 1) % bannerAdapter.getItemCount(), true);
+                bannerHandler.postDelayed(this, 4500L);
+            }
+        }
+    };
     private final ActivityResultLauncher<String[]> permissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissions);
 
@@ -57,7 +73,16 @@ public class GuestHomeFragment extends Fragment {
         message = view.findViewById(R.id.homeMessage); progress = view.findViewById(R.id.homeProgress);
         greeting = view.findViewById(R.id.homeGreeting);
         locationLabel = view.findViewById(R.id.homeLocationLabel);
-        bannerSection = view.findViewById(R.id.bannerSection);
+        bannerPager = view.findViewById(R.id.bannerPager);
+        bannerDots = view.findViewById(R.id.bannerDots);
+        bannerAdapter = new BannerPagerAdapter(banner -> {
+            if (!banner.getCampaignId().isEmpty()) openCampaign(banner.getCampaignId());
+        });
+        bannerPager.setAdapter(bannerAdapter);
+        bannerPageCallback = new ViewPager2.OnPageChangeCallback() {
+            @Override public void onPageSelected(int position) { renderBannerDots(bannerAdapter.getItemCount(), position); }
+        };
+        bannerPager.registerOnPageChangeCallback(bannerPageCallback);
         criticalSection = view.findViewById(R.id.criticalSection);
         valueSection = view.findViewById(R.id.valueSection);
         campaignSection = view.findViewById(R.id.campaignSection);
@@ -141,23 +166,22 @@ public class GuestHomeFragment extends Fragment {
         }
     }
     private void renderBanners(List<Banner> values) {
-        bannerSection.removeAllViews();
-        if (values.isEmpty()) { bannerSection.addView(renderer.message("Chưa có banner đang hiệu lực.")); return; }
-        for (Banner value : values) {
-            View card = renderer.banner(value, v -> {
-                if (!value.getCampaignId().isEmpty()) openCampaign(value.getCampaignId());
-            });
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(250), -2);
-            params.setMargins(0, dp(4), dp(10), dp(2));
-            bannerSection.addView(card, params);
+        bannerAdapter.submit(values);
+        if (values.isEmpty() || bannerPager.getCurrentItem() >= values.size()) bannerPager.setCurrentItem(0, false);
+        bannerPager.setVisibility(values.isEmpty() ? View.GONE : View.VISIBLE);
+        bannerDots.setVisibility(values.size() < 2 ? View.GONE : View.VISIBLE);
+        renderBannerDots(values.size(), bannerPager.getCurrentItem());
+        bannerHandler.removeCallbacks(bannerAutoScroll);
+        if (values.size() > 1 && getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            bannerHandler.postDelayed(bannerAutoScroll, 4500L);
         }
     }
     private void renderCampaigns(LinearLayout container, List<RescueCampaign> values,
             HomeViewState state, String empty) {
         container.removeAllViews();
         if (values.isEmpty()) { container.addView(renderer.message(empty)); return; }
-        addGrid(container, values, value -> renderer.campaign(value,
-                state.distanceFor(value.getId()), v -> openCampaign(value.getId())));
+        addHorizontal(container, values, value -> renderer.campaign(value,
+                state.distanceFor(value.getId()), state.getValueProducts(), v -> openCampaign(value.getId())));
     }
     private void renderProducts(List<Product> values) {
         valueSection.removeAllViews();
@@ -166,21 +190,68 @@ public class GuestHomeFragment extends Fragment {
     }
     private void renderCategories(List<Category> values) {
         categorySection.removeAllViews();
+        categorySection.setClipChildren(false);
+        categorySection.setClipToPadding(false);
         if (values.isEmpty()) { categorySection.addView(renderer.message("Chưa có danh mục trong cache.")); return; }
-        addGrid(categorySection, values, value -> renderer.category(value, v -> {
-            Bundle args = new Bundle(); args.putString("categoryId", value.getId());
-            Navigation.findNavController(requireView()).navigate(
-                    R.id.action_guestHomeFragment_to_discoveryFragment, args);
-        }));
+        for (int index = 0; index < values.size(); index += 2) {
+            LinearLayout column = new LinearLayout(requireContext());
+            column.setOrientation(LinearLayout.VERTICAL);
+            column.setClipChildren(false);
+            column.setClipToPadding(false);
+            LinearLayout.LayoutParams columnParams = new LinearLayout.LayoutParams(dp(76), -2);
+            columnParams.setMargins(0, 0, dp(4), 0);
+            categorySection.addView(column, columnParams);
+            for (int row = 0; row < 2 && index + row < values.size(); row++) {
+                Category category = values.get(index + row);
+                View tile = renderer.category(category, v -> {
+                    Bundle args = new Bundle(); args.putString("categoryId", category.getId());
+                    Navigation.findNavController(requireView()).navigate(
+                            R.id.action_guestHomeFragment_to_discoveryFragment, args);
+                });
+                column.addView(tile, new LinearLayout.LayoutParams(-1, dp(86)));
+            }
+        }
+    }
+
+    private void renderBannerDots(int count, int selected) {
+        if (bannerDots == null) return;
+        bannerDots.removeAllViews();
+        for (int index = 0; index < count; index++) {
+            View dot = new View(requireContext());
+            GradientDrawable background = new GradientDrawable();
+            background.setShape(GradientDrawable.RECTANGLE);
+            background.setCornerRadius(dp(8));
+            background.setColor(requireContext().getColor(index == selected
+                    ? R.color.rescue_primary : R.color.rescue_outline));
+            dot.setBackground(background);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    dp(index == selected ? 16 : 6), dp(6));
+            params.setMargins(dp(3), 0, dp(3), 0);
+            bannerDots.addView(dot, params);
+        }
+    }
+
+    private <T> void addHorizontal(LinearLayout container, List<T> values,
+                                   Function<T, View> createView) {
+        for (T value : values) {
+            View item = createView.apply(value);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(248), -2);
+            params.setMargins(0, dp(3), dp(10), dp(5));
+            container.addView(item, params);
+        }
     }
 
     private <T> void addGrid(LinearLayout container, List<T> values, Function<T, View> createView) {
         int horizontalGap = dp(6);
+        container.setClipChildren(false);
+        container.setClipToPadding(false);
         for (int index = 0; index < values.size(); index += 2) {
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setClipChildren(false);
+            row.setClipToPadding(false);
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
-            rowParams.setMargins(0, 0, 0, dp(2));
+            rowParams.setMargins(0, dp(2), 0, dp(5));
             container.addView(row, rowParams);
 
             View first = createView.apply(values.get(index));
@@ -211,4 +282,24 @@ public class GuestHomeFragment extends Fragment {
                 R.id.action_guestHomeFragment_to_postDetailFragment, args);
     }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+
+    @Override public void onResume() {
+        super.onResume();
+        bannerHandler.removeCallbacks(bannerAutoScroll);
+        bannerHandler.postDelayed(bannerAutoScroll, 4500L);
+    }
+
+    @Override public void onPause() {
+        bannerHandler.removeCallbacks(bannerAutoScroll);
+        super.onPause();
+    }
+
+    @Override public void onDestroyView() {
+        bannerHandler.removeCallbacks(bannerAutoScroll);
+        if (bannerPager != null && bannerPageCallback != null) {
+            bannerPager.unregisterOnPageChangeCallback(bannerPageCallback);
+        }
+        bannerPager = null;
+        super.onDestroyView();
+    }
 }

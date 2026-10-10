@@ -41,6 +41,9 @@ public interface AdminRepository {
 
     void loadDashboard(DashboardCallback callback);
     void loadSection(Section section, int limit, ListCallback callback);
+    default androidx.lifecycle.LiveData<List<AdminListItem>> observeSection(Section section, int limit) {
+        return new androidx.lifecycle.MutableLiveData<>(java.util.Collections.emptyList());
+    }
     void transition(Section section, String resourceId, String targetStatus,
             String reason, ActionCallback callback);
     void setActive(Section section, String resourceId, boolean active,

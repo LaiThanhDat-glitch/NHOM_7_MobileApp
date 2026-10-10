@@ -35,7 +35,7 @@ public final class PostCardRenderer {
         if (showModerationStatus) body.addView(text("Trạng thái: " + post.getStatus().name(), 13, true));
         if (post.getCreatedAt() != null) body.addView(text(DateFormat.getDateTimeInstance(
                 DateFormat.SHORT, DateFormat.SHORT, Locale.forLanguageTag("vi-VN")).format(post.getCreatedAt()), 12, false));
-        card.addView(body); card.setOnClickListener(listener); return card;
+        card.addView(body, new FrameLayout.LayoutParams(-1, -2)); card.setOnClickListener(listener); return card;
     }
     public View homeCard(Post post, View.OnClickListener listener) {
         MaterialCardView card = new MaterialCardView(fragment.requireContext());
@@ -63,7 +63,7 @@ public final class PostCardRenderer {
         body.addView(title);
         TextView excerpt = text(post.getContent(), 11, false); excerpt.setMaxLines(2);
         body.addView(excerpt);
-        card.addView(body); card.setOnClickListener(listener); return card;
+        card.addView(body, new FrameLayout.LayoutParams(-1, -2)); card.setOnClickListener(listener); return card;
     }
     public TextView message(String value) { return text(value, 14, false); }
     private TextView text(String value, int size, boolean bold) {

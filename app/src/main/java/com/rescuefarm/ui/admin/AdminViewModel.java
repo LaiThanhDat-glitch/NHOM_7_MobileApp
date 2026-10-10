@@ -19,6 +19,9 @@ public final class AdminViewModel extends ViewModel {
 
     public AdminViewModel(AdminRepository repository) { this.repository = repository; }
     public LiveData<AdminScreenState> getState() { return state; }
+    public LiveData<List<AdminListItem>> observeSection(Section section) {
+        return repository.observeSection(section, PAGE_SIZE);
+    }
 
     public void refreshDashboard() {
         currentSection = Section.ANALYTICS;

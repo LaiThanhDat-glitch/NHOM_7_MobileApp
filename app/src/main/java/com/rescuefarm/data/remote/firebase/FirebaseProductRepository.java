@@ -1,6 +1,7 @@
 package com.rescuefarm.data.remote.firebase;
 
 import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.Transformations;
 import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
@@ -9,6 +10,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.rescuefarm.data.local.dao.CatalogCacheDao;
 import com.rescuefarm.data.local.database.RescueFarmDatabase;
 import com.rescuefarm.data.local.entity.CategoryCacheEntity;
@@ -61,8 +63,57 @@ public class FirebaseProductRepository implements ProductRepository {
     @Override public LiveData<List<Product>> observeSellerProducts(String sellerId) {
         return Transformations.map(dao.observeSellerProducts(sellerId), CatalogCacheMapper::products);
     }
+    @Override public LiveData<Product> observeProduct(String productId) {
+        return new LiveData<Product>() {
+            private ListenerRegistration registration;
+            @Override protected void onActive() {
+                registration = firestore.collection(PRODUCTS).document(productId)
+                        .addSnapshotListener((snapshot, error) -> {
+                            if (error != null || snapshot == null) return;
+                            Product product = snapshot.exists() ? mapProduct(snapshot) : null;
+                            postValue(product);
+                            if (product != null) cacheExecutor.execute(() -> dao.replaceProduct(
+                                    CatalogCacheMapper.toEntity(product, System.currentTimeMillis())));
+                        });
+            }
+            @Override protected void onInactive() {
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
+    }
     @Override public LiveData<List<ProductBatch>> observeBatches(String productId) {
-        return Transformations.map(dao.observeBatches(productId), CatalogCacheMapper::batches);
+        MediatorLiveData<List<ProductBatch>> result = new MediatorLiveData<>();
+        result.addSource(dao.observeBatches(productId), entities ->
+                result.setValue(CatalogCacheMapper.batches(entities)));
+        LiveData<List<ProductBatch>> remote = new LiveData<List<ProductBatch>>() {
+            private ListenerRegistration registration;
+            @Override protected void onActive() {
+                registration = firestore.collection(BATCHES).whereEqualTo("productId", productId)
+                        .addSnapshotListener((snapshot, error) -> {
+                            if (error != null || snapshot == null) return;
+                            List<ProductBatch> values = new ArrayList<>();
+                            List<ProductBatchCacheEntity> entities = new ArrayList<>();
+                            long now = System.currentTimeMillis();
+                            for (DocumentSnapshot document : snapshot.getDocuments()) {
+                                ProductBatch batch = mapBatch(document);
+                                if (batch != null) {
+                                    values.add(batch);
+                                    entities.add(CatalogCacheMapper.toEntity(batch, now));
+                                }
+                            }
+                            postValue(values);
+                            cacheExecutor.execute(() -> database.runInTransaction(() -> {
+                                dao.clearBatches(productId);
+                                dao.replaceBatches(entities);
+                            }));
+                        });
+            }
+            @Override protected void onInactive() {
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
+        result.addSource(remote, result::setValue);
+        return result;
     }
 
     @Override public void refreshCatalog(ActionCallback callback) {
@@ -282,6 +333,22 @@ public class FirebaseProductRepository implements ProductRepository {
                     if (value == null) callback.onError(ErrorCode.VALIDATION, "Dữ liệu khuyến mãi không hợp lệ.");
                     else callback.onSuccess(value);
                 }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
+    }
+
+    @Override public LiveData<Promotion> observePromotion(String productId) {
+        return new LiveData<Promotion>() {
+            private ListenerRegistration registration;
+            @Override protected void onActive() {
+                registration = firestore.collection(PROMOTIONS).document(productId)
+                        .addSnapshotListener((snapshot, error) -> {
+                            if (error != null || snapshot == null) return;
+                            postValue(snapshot.exists() ? mapPromotion(snapshot) : null);
+                        });
+            }
+            @Override protected void onInactive() {
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
     }
 
     @Override public void getSellerPromotions(String sellerId, PromotionListCallback callback) {

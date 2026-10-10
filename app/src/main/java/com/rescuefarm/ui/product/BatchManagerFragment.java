@@ -8,6 +8,8 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -23,6 +25,7 @@ import java.util.Locale;
 public class BatchManagerFragment extends Fragment {
     private ProductViewModel viewModel; private String productId, editingId = ""; private long editingVersion;
     private LinearLayout container; private TextInputEditText harvest, expiry, quantity;
+    private boolean dirty, binding;
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         return inflater.inflate(R.layout.fragment_batch_manager, parent, false);
@@ -34,6 +37,15 @@ public class BatchManagerFragment extends Fragment {
         expiry = view.findViewById(R.id.expiryDateInput); quantity = view.findViewById(R.id.batchQuantityInput);
         viewModel = new ViewModelProvider(this, new ProductViewModelFactory(requireContext()))
                 .get(ProductViewModel.class);
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!binding) dirty = true;
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        harvest.addTextChangedListener(watcher); expiry.addTextChangedListener(watcher);
+        quantity.addTextChangedListener(watcher);
         viewModel.getBatches(productId).observe(getViewLifecycleOwner(), this::render);
         viewModel.getState().observe(getViewLifecycleOwner(), value -> {
             if (value.getStatus() == ProductScreenState.Status.SAVED) {
@@ -50,6 +62,9 @@ public class BatchManagerFragment extends Fragment {
     private void render(List<ProductBatch> batches) {
         container.removeAllViews(); if (batches == null) return;
         for (ProductBatch batch : batches) container.addView(card(batch));
+        if (!dirty && !editingId.isEmpty()) for (ProductBatch batch : batches) {
+            if (editingId.equals(batch.getId())) { edit(batch); break; }
+        }
     }
     private View card(ProductBatch batch) {
         MaterialCardView card = new MaterialCardView(requireContext());
@@ -68,13 +83,18 @@ public class BatchManagerFragment extends Fragment {
         actions.addView(edit); actions.addView(delete); body.addView(info); body.addView(actions); card.addView(body); return card;
     }
     private void edit(ProductBatch batch) {
+        binding = true; dirty = false;
         editingId = batch.getId(); editingVersion = batch.getInventoryVersion();
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         harvest.setText(batch.getHarvestDate() == null ? "" : format.format(batch.getHarvestDate()));
         expiry.setText(batch.getExpiryDate() == null ? "" : format.format(batch.getExpiryDate()));
         quantity.setText(String.valueOf(batch.getInitialQuantity()));
+        binding = false;
     }
-    private void clearEditor() { editingId = ""; editingVersion = 0L; harvest.setText(""); expiry.setText(""); quantity.setText(""); }
+    private void clearEditor() {
+        binding = true; dirty = false; editingId = ""; editingVersion = 0L;
+        harvest.setText(""); expiry.setText(""); quantity.setText(""); binding = false;
+    }
     private static String text(TextInputEditText input) { return input.getText() == null ? "" : input.getText().toString(); }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 }

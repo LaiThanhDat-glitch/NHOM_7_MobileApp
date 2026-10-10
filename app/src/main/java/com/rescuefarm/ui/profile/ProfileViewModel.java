@@ -26,6 +26,25 @@ public class ProfileViewModel extends ViewModel {
     }
 
     public LiveData<ProfileScreenState> getState() { return state; }
+    public LiveData<User> observeProfile() {
+        String userId = authRepository.getCurrentUserId();
+        return userId == null ? new MutableLiveData<>() : userRepository.observeUser(userId);
+    }
+    public LiveData<java.util.List<Address>> observeAddresses() {
+        String userId = authRepository.getCurrentUserId();
+        return userId == null ? new MutableLiveData<>(java.util.Collections.emptyList())
+                : userRepository.observeAddresses(userId);
+    }
+    public LiveData<Address> observeAddress(String addressId) {
+        String userId = authRepository.getCurrentUserId();
+        return userId == null || addressId == null || addressId.trim().isEmpty()
+                ? new MutableLiveData<>() : userRepository.observeAddress(userId, addressId);
+    }
+    public LiveData<SellerApplication> observeSellerApplication() {
+        String userId = authRepository.getCurrentUserId();
+        return userId == null ? new MutableLiveData<>()
+                : userRepository.observeSellerApplication(userId);
+    }
     public boolean isAuthenticated() { return authRepository.isAuthenticated(); }
     public String getCurrentUserId() { return authRepository.getCurrentUserId(); }
 

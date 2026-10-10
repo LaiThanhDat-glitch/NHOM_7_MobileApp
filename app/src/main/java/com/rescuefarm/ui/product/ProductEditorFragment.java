@@ -7,6 +7,8 @@ import android.view.ViewGroup;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -22,6 +24,7 @@ public class ProductEditorFragment extends Fragment {
     private ProductViewModel viewModel; private String id = "";
     private TextInputEditText category, name, description, originalPrice, rescuePrice, unit, origin, province, images;
     private RadioGroup statusGroup;
+    private boolean dirty, binding;
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         return inflater.inflate(R.layout.fragment_product_editor, parent, false);
@@ -35,6 +38,19 @@ public class ProductEditorFragment extends Fragment {
         readArguments();
         viewModel = new ViewModelProvider(this, new ProductViewModelFactory(requireContext()))
                 .get(ProductViewModel.class);
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!binding) dirty = true;
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        for (TextInputEditText input : new TextInputEditText[]{category, name, description,
+                originalPrice, rescuePrice, unit, origin, province, images}) input.addTextChangedListener(watcher);
+        statusGroup.setOnCheckedChangeListener((group, checkedId) -> { if (!binding) dirty = true; });
+        if (!id.isEmpty()) viewModel.observeProduct(id).observe(getViewLifecycleOwner(), value -> {
+            if (value != null && !dirty) populate(value);
+        });
         viewModel.getCategories().observe(getViewLifecycleOwner(), values -> showCategories(view, values));
         viewModel.getState().observe(getViewLifecycleOwner(), value -> {
             if (value.getStatus() == ProductScreenState.Status.SAVED) {
@@ -47,6 +63,18 @@ public class ProductEditorFragment extends Fragment {
                 text(category), text(name), text(description), text(originalPrice), text(rescuePrice),
                 text(unit), text(origin), text(province), text(images), selectedStatus()));
         viewModel.refreshCatalog();
+    }
+    private void populate(com.rescuefarm.domain.model.Product value) {
+        binding = true;
+        category.setText(value.getCategoryId()); name.setText(value.getName());
+        description.setText(value.getDescription());
+        originalPrice.setText(String.valueOf(value.getOriginalPrice()));
+        rescuePrice.setText(String.valueOf(value.getRescuePrice())); unit.setText(value.getUnit());
+        origin.setText(value.getOrigin()); province.setText(value.getProvince());
+        images.setText(String.join("\n", value.getImageUrls()));
+        statusGroup.check(value.getStatus() == ProductStatus.INACTIVE || value.getStatus() == ProductStatus.HIDDEN
+                ? R.id.productStatusInactive : R.id.productStatusActive);
+        binding = false;
     }
     private void readArguments() {
         Bundle b = getArguments(); if (b == null) return; id = safe(b.getString("id"));

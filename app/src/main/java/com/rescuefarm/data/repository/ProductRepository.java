@@ -40,6 +40,12 @@ public interface ProductRepository {
     LiveData<List<Category>> observeCategories();
     LiveData<List<Product>> observeProducts();
     LiveData<List<Product>> observeSellerProducts(String sellerId);
+    default LiveData<Product> observeProduct(String productId) {
+        return new androidx.lifecycle.MutableLiveData<>();
+    }
+    default LiveData<Promotion> observePromotion(String productId) {
+        return new androidx.lifecycle.MutableLiveData<>();
+    }
     LiveData<List<ProductBatch>> observeBatches(String productId);
     void refreshCatalog(ActionCallback callback);
     void refreshSellerProducts(String sellerId, ActionCallback callback);

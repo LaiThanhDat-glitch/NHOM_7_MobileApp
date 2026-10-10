@@ -7,6 +7,8 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -24,6 +26,7 @@ import com.bumptech.glide.Glide;
 public class SellerProfileFragment extends Fragment {
     private TextInputEditText representativeInput, shopNameInput, descriptionInput, avatarInput, addressInput;
     private ImageView sellerAvatarView;
+    private boolean dirty, binding;
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,
             @Nullable ViewGroup container, @Nullable Bundle state) {
         return inflater.inflate(R.layout.fragment_seller_profile, container, false);
@@ -84,31 +87,59 @@ public class SellerProfileFragment extends Fragment {
                 ((TextView) view.findViewById(R.id.sellerStatus)).setText(seller.getSellerStatus().name());
                 ((TextView) view.findViewById(R.id.sellerBusinessRule)).setText(seller.canSell()
                         ? R.string.seller_approved_message : R.string.seller_pending_message);
-                representativeInput.setText(seller.getRepresentativeName());
-                shopNameInput.setText(seller.getShopName());
-                descriptionInput.setText(seller.getShopDescription());
-                avatarInput.setText(seller.getShopAvatarUrl());
-                addressInput.setText(seller.getAddress());
-                String shopAvatarUrl = seller.getShopAvatarUrl();
-                if (shopAvatarUrl != null && !shopAvatarUrl.trim().isEmpty()) {
-                    sellerAvatarView.setPadding(0, 0, 0, 0);
-                    sellerAvatarView.setImageTintList(null);
-                    Glide.with(this).load(shopAvatarUrl.trim()).circleCrop()
-                            .placeholder(R.drawable.ic_nav_profile).error(R.drawable.ic_nav_profile)
-                            .into(sellerAvatarView);
-                } else {
-                    Glide.with(this).clear(sellerAvatarView);
-                    sellerAvatarView.setPadding(16, 16, 16, 16);
-                    sellerAvatarView.setImageResource(R.drawable.ic_nav_profile);
-                    sellerAvatarView.setImageTintList(android.content.res.ColorStateList.valueOf(
-                            requireContext().getColor(R.color.rescue_primary)));
-                }
+                if (!dirty) populate(seller);
+                renderAvatar(seller.getShopAvatarUrl());
             } else if (value.getStatus() == ProfileScreenState.Status.SAVED) {
                 Toast.makeText(requireContext(), value.getMessage(), Toast.LENGTH_SHORT).show();
+                dirty = false;
                 viewModel.loadProfile();
             }
         });
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!binding) dirty = true;
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        representativeInput.addTextChangedListener(watcher);
+        shopNameInput.addTextChangedListener(watcher);
+        descriptionInput.addTextChangedListener(watcher);
+        avatarInput.addTextChangedListener(watcher);
+        addressInput.addTextChangedListener(watcher);
+        viewModel.observeProfile().observe(getViewLifecycleOwner(), user -> {
+            if (user instanceof Seller) {
+                if (!dirty) populate((Seller) user);
+                renderAvatar(((Seller) user).getShopAvatarUrl());
+            }
+        });
         viewModel.loadProfile();
+    }
+
+    private void populate(Seller seller) {
+        binding = true;
+        representativeInput.setText(seller.getRepresentativeName());
+        shopNameInput.setText(seller.getShopName());
+        descriptionInput.setText(seller.getShopDescription());
+        avatarInput.setText(seller.getShopAvatarUrl());
+        addressInput.setText(seller.getAddress());
+        binding = false;
+    }
+
+    private void renderAvatar(String shopAvatarUrl) {
+        if (shopAvatarUrl != null && !shopAvatarUrl.trim().isEmpty()) {
+            sellerAvatarView.setPadding(0, 0, 0, 0);
+            sellerAvatarView.setImageTintList(null);
+            Glide.with(this).load(shopAvatarUrl.trim()).circleCrop()
+                    .placeholder(R.drawable.ic_nav_profile).error(R.drawable.ic_nav_profile)
+                    .into(sellerAvatarView);
+        } else {
+            Glide.with(this).clear(sellerAvatarView);
+            sellerAvatarView.setPadding(16, 16, 16, 16);
+            sellerAvatarView.setImageResource(R.drawable.ic_nav_profile);
+            sellerAvatarView.setImageTintList(android.content.res.ColorStateList.valueOf(
+                    requireContext().getColor(R.color.rescue_primary)));
+        }
     }
 
     private static String text(TextInputEditText input) {

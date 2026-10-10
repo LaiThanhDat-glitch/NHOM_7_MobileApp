@@ -9,6 +9,7 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.MetadataChanges;
 import com.rescuefarm.data.repository.UserRepository;
 import com.rescuefarm.domain.enums.AddressType;
 import com.rescuefarm.domain.enums.ApplicationStatus;
@@ -127,6 +128,45 @@ public class FirebaseUserRepository implements UserRepository {
         }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
     }
 
+    @Override public LiveData<List<Address>> observeAddresses(String customerId) {
+        return new LiveData<List<Address>>() {
+            private ListenerRegistration registration;
+            @Override protected void onActive() {
+                registration = user(customerId).collection(ADDRESSES)
+                        .addSnapshotListener((snapshot, exception) -> {
+                            if (exception != null || snapshot == null) return;
+                            List<Address> values = new ArrayList<>();
+                            for (DocumentSnapshot document : snapshot.getDocuments()) {
+                                Address address = mapAddress(document, customerId);
+                                if (address != null) values.add(address);
+                            }
+                            values.sort((left, right) -> Boolean.compare(
+                                    right.isDefault(), left.isDefault()));
+                            postValue(values);
+                        });
+            }
+            @Override protected void onInactive() {
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
+    }
+
+    @Override public LiveData<Address> observeAddress(String customerId, String addressId) {
+        return new LiveData<Address>() {
+            private ListenerRegistration registration;
+            @Override protected void onActive() {
+                registration = user(customerId).collection(ADDRESSES).document(addressId)
+                        .addSnapshotListener((snapshot, exception) -> {
+                            if (exception != null || snapshot == null) return;
+                            postValue(snapshot.exists() ? mapAddress(snapshot, customerId) : null);
+                        });
+            }
+            @Override protected void onInactive() {
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
+    }
+
     @Override public void saveAddress(String customerId, Address address, AddressCallback callback) {
         DocumentReference userRef = user(customerId);
         DocumentReference addressRef = clean(address.getId()).isEmpty()
@@ -186,6 +226,22 @@ public class FirebaseUserRepository implements UserRepository {
             if (!snapshot.exists()) callback.onError(ProfileError.NOT_FOUND, "Bạn chưa gửi hồ sơ người bán.");
             else callback.onSuccess(mapApplication(snapshot));
         }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
+    }
+
+    @Override public LiveData<SellerApplication> observeSellerApplication(String sellerId) {
+        return new LiveData<SellerApplication>() {
+            private ListenerRegistration registration;
+            @Override protected void onActive() {
+                registration = firestore.collection(SELLER_APPLICATIONS).document(sellerId)
+                        .addSnapshotListener(MetadataChanges.INCLUDE, (snapshot, exception) -> {
+                            if (exception != null || snapshot == null) return;
+                            postValue(snapshot.exists() ? mapApplication(snapshot) : null);
+                        });
+            }
+            @Override protected void onInactive() {
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
     }
 
     @Override public void submitSellerApplication(String sellerId, SellerApplication application,
