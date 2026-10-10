@@ -29,6 +29,8 @@ public class ProfileViewModel extends ViewModel {
     public boolean isAuthenticated() { return authRepository.isAuthenticated(); }
     public String getCurrentUserId() { return authRepository.getCurrentUserId(); }
 
+    public void signOut() { authRepository.signOut(); }
+
     public void loadProfile() {
         String userId = requireUserId(); if (userId == null) return;
         state.setValue(ProfileScreenState.loading());

@@ -106,6 +106,8 @@
             app:destination="@id/campaignDetailFragment" />
         <action android:id="@+id/action_guestHomeFragment_to_feedFragment"
             app:destination="@id/feedFragment" />
+        <action android:id="@+id/action_guestHomeFragment_to_notificationFragment"
+            app:destination="@id/notificationFragment" />
         <action android:id="@+id/action_guestHomeFragment_to_postDetailFragment"
             app:destination="@id/postDetailFragment" />
         <action android:id="@+id/action_guestHomeFragment_to_cartFragment"

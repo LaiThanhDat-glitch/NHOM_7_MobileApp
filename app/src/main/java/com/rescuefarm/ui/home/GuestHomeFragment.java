@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.Space;
 import android.widget.TextView;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -30,6 +31,7 @@ import com.google.android.material.button.MaterialButton;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 public class GuestHomeFragment extends Fragment {
     private HomeViewModel viewModel;
@@ -37,9 +39,10 @@ public class GuestHomeFragment extends Fragment {
     private HomeCardRenderer renderer;
     private PostCardRenderer postRenderer;
     private TextView message;
+    private TextView greeting, locationLabel;
     private ProgressBar progress;
-    private LinearLayout bannerSection, criticalSection, mobileSection, fixedSection,
-            endingSection, valueSection, campaignSection, categorySection, feedSection;
+    private TextView feedTitle;
+    private LinearLayout bannerSection, criticalSection, valueSection, campaignSection, categorySection, feedSection;
     private final ActivityResultLauncher<String[]> permissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissions);
 
@@ -52,14 +55,14 @@ public class GuestHomeFragment extends Fragment {
         super.onViewCreated(view, state); renderer = new HomeCardRenderer(this);
         postRenderer = new PostCardRenderer(this);
         message = view.findViewById(R.id.homeMessage); progress = view.findViewById(R.id.homeProgress);
+        greeting = view.findViewById(R.id.homeGreeting);
+        locationLabel = view.findViewById(R.id.homeLocationLabel);
         bannerSection = view.findViewById(R.id.bannerSection);
         criticalSection = view.findViewById(R.id.criticalSection);
-        mobileSection = view.findViewById(R.id.mobileSection);
-        fixedSection = view.findViewById(R.id.fixedSection);
-        endingSection = view.findViewById(R.id.endingSection);
         valueSection = view.findViewById(R.id.valueSection);
         campaignSection = view.findViewById(R.id.campaignSection);
         categorySection = view.findViewById(R.id.categorySection);
+        feedTitle = view.findViewById(R.id.feedTitle);
         feedSection = view.findViewById(R.id.feedSection);
         viewModel = new ViewModelProvider(this, new HomeViewModelFactory(requireContext()))
                 .get(HomeViewModel.class);
@@ -67,20 +70,18 @@ public class GuestHomeFragment extends Fragment {
                 .get(PostViewModel.class);
         viewModel.getHomeState().observe(getViewLifecycleOwner(), this::render);
         postViewModel.getFeed().observe(getViewLifecycleOwner(), this::renderFeed);
+        viewModel.getGreetingName().observe(getViewLifecycleOwner(), name ->
+                greeting.setText(getString(R.string.home_greeting_format,
+                        name == null || name.trim().isEmpty() ? "bạn" : name.trim())));
 
-        View login = view.findViewById(R.id.loginButton); View profile = view.findViewById(R.id.profileButton);
-        login.setVisibility(viewModel.isAuthenticated() ? View.GONE : View.VISIBLE);
-        profile.setVisibility(viewModel.isAuthenticated() ? View.VISIBLE : View.GONE);
-        login.setOnClickListener(Navigation.createNavigateOnClickListener(
-                R.id.action_guestHomeFragment_to_loginFragment));
-        profile.setOnClickListener(Navigation.createNavigateOnClickListener(
-                R.id.action_guestHomeFragment_to_profileFragment));
         view.findViewById(R.id.searchButton).setOnClickListener(Navigation.createNavigateOnClickListener(
                 R.id.action_guestHomeFragment_to_discoveryFragment));
-        view.findViewById(R.id.cartHomeButton).setOnClickListener(Navigation.createNavigateOnClickListener(
-                R.id.action_guestHomeFragment_to_cartFragment));
+        view.findViewById(R.id.notificationButton).setOnClickListener(unused ->
+                Navigation.findNavController(view).navigate(viewModel.isAuthenticated()
+                        ? R.id.action_guestHomeFragment_to_notificationFragment
+                        : R.id.action_guestHomeFragment_to_loginFragment));
         view.findViewById(R.id.refreshHomeButton).setOnClickListener(v -> viewModel.refresh());
-        view.findViewById(R.id.locationHomeButton).setOnClickListener(v -> requestLocation());
+        locationLabel.setOnClickListener(v -> requestLocation());
         viewModel.refresh(); postViewModel.refreshFeed();
     }
 
@@ -104,55 +105,95 @@ public class GuestHomeFragment extends Fragment {
         String prefix = state.getDataFreshness() == HomeViewState.DataFreshness.OFFLINE ? "OFFLINE • "
                 : state.getDataFreshness() == HomeViewState.DataFreshness.STALE ? "CACHE CŨ • " : "";
         message.setText(prefix + state.getMessage()); progress.setVisibility(state.isRefreshing() ? View.VISIBLE : View.GONE);
+        locationLabel.setText(state.getLocationState() == HomeViewState.LocationState.AVAILABLE
+                ? R.string.home_location_active : state.getLocationState() == HomeViewState.LocationState.LOADING
+                ? R.string.home_location_loading : R.string.home_location_default);
         renderBanners(state.getBanners());
         renderCampaigns(criticalSection, state.getCritical(), state, "Chưa có chiến dịch CRITICAL.");
-        String nearbyEmpty = state.getLocationState() == HomeViewState.LocationState.AVAILABLE
-                ? "Không có điểm phù hợp gần vị trí hiện tại." : "Bấm ‘Dùng vị trí’ để xem mục này.";
-        renderCampaigns(mobileSection, state.getNearbyMobile(), state, nearbyEmpty);
-        renderCampaigns(fixedSection, state.getNearbyFixed(), state, nearbyEmpty);
-        renderCampaigns(endingSection, state.getEndingSoon(), state, "Chưa có chiến dịch sắp kết thúc.");
         renderProducts(state.getValueProducts());
-        renderCampaigns(campaignSection, state.getActiveCampaigns(), state, "Chưa có chiến dịch ACTIVE trong cache.");
+        List<RescueCampaign> otherCampaigns = new ArrayList<>();
+        for (RescueCampaign campaign : state.getActiveCampaigns()) {
+            if (campaign.getUrgencyLevel() != com.rescuefarm.domain.enums.UrgencyLevel.CRITICAL) {
+                otherCampaigns.add(campaign);
+            }
+        }
+        renderCampaigns(campaignSection, otherCampaigns, state, "Chưa có chiến dịch khác đang diễn ra.");
         renderCategories(state.getCategories());
     }
     private void renderFeed(List<Post> values) {
-        feedSection.removeAllViews(); List<Post> safe = values == null ? new ArrayList<>() : values;
-        if (safe.isEmpty()) feedSection.addView(postRenderer.message("Chưa có post đã duyệt trong cache."));
-        else for (int index = 0; index < Math.min(3, safe.size()); index++) {
-            Post post = safe.get(index); feedSection.addView(postRenderer.card(post, false,
-                    v -> openPost(post.getId())));
+        feedSection.removeAllViews();
+        List<Post> safe = values == null ? new ArrayList<>() : values;
+        feedTitle.setVisibility(safe.isEmpty() ? View.GONE : View.VISIBLE);
+        feedSection.setVisibility(safe.isEmpty() ? View.GONE : View.VISIBLE);
+        int count = Math.min(4, safe.size());
+        addGrid(feedSection, safe.subList(0, count), post -> postRenderer.homeCard(post,
+                v -> openPost(post.getId())));
+        if (!safe.isEmpty()) {
+            MaterialButton all = new MaterialButton(requireContext());
+            all.setText(R.string.open_feed_action);
+            all.setTextColor(requireContext().getColor(R.color.rescue_primary));
+            all.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                    requireContext().getColor(R.color.rescue_primary_container)));
+            all.setElevation(0);
+            all.setOnClickListener(v -> Navigation.findNavController(requireView()).navigate(
+                    R.id.action_guestHomeFragment_to_feedFragment));
+            feedSection.addView(all, new LinearLayout.LayoutParams(-1, dp(40)));
         }
-        MaterialButton all = new MaterialButton(requireContext()); all.setText(R.string.open_feed_action);
-        all.setOnClickListener(v -> Navigation.findNavController(requireView()).navigate(
-                R.id.action_guestHomeFragment_to_feedFragment)); feedSection.addView(all);
     }
     private void renderBanners(List<Banner> values) {
         bannerSection.removeAllViews();
         if (values.isEmpty()) { bannerSection.addView(renderer.message("Chưa có banner đang hiệu lực.")); return; }
-        for (Banner value : values) bannerSection.addView(renderer.banner(value, v -> {
-            if (!value.getCampaignId().isEmpty()) openCampaign(value.getCampaignId());
-        }));
+        for (Banner value : values) {
+            View card = renderer.banner(value, v -> {
+                if (!value.getCampaignId().isEmpty()) openCampaign(value.getCampaignId());
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(250), -2);
+            params.setMargins(0, dp(4), dp(10), dp(2));
+            bannerSection.addView(card, params);
+        }
     }
     private void renderCampaigns(LinearLayout container, List<RescueCampaign> values,
             HomeViewState state, String empty) {
         container.removeAllViews();
         if (values.isEmpty()) { container.addView(renderer.message(empty)); return; }
-        for (RescueCampaign value : values) container.addView(renderer.campaign(value,
+        addGrid(container, values, value -> renderer.campaign(value,
                 state.distanceFor(value.getId()), v -> openCampaign(value.getId())));
     }
     private void renderProducts(List<Product> values) {
         valueSection.removeAllViews();
         if (values.isEmpty()) { valueSection.addView(renderer.message("Chưa có nông sản giảm giá trong cache.")); return; }
-        for (Product value : values) valueSection.addView(renderer.product(value, v -> openProduct(value.getId())));
+        addGrid(valueSection, values, value -> renderer.product(value, v -> openProduct(value.getId())));
     }
     private void renderCategories(List<Category> values) {
         categorySection.removeAllViews();
         if (values.isEmpty()) { categorySection.addView(renderer.message("Chưa có danh mục trong cache.")); return; }
-        for (Category value : values) categorySection.addView(renderer.category(value, v -> {
+        addGrid(categorySection, values, value -> renderer.category(value, v -> {
             Bundle args = new Bundle(); args.putString("categoryId", value.getId());
             Navigation.findNavController(requireView()).navigate(
                     R.id.action_guestHomeFragment_to_discoveryFragment, args);
         }));
+    }
+
+    private <T> void addGrid(LinearLayout container, List<T> values, Function<T, View> createView) {
+        int horizontalGap = dp(6);
+        for (int index = 0; index < values.size(); index += 2) {
+            LinearLayout row = new LinearLayout(requireContext());
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+            rowParams.setMargins(0, 0, 0, dp(2));
+            container.addView(row, rowParams);
+
+            View first = createView.apply(values.get(index));
+            LinearLayout.LayoutParams firstParams = new LinearLayout.LayoutParams(0, -2, 1f);
+            firstParams.setMargins(0, 0, horizontalGap, 0);
+            row.addView(first, firstParams);
+            if (index + 1 < values.size()) {
+                View second = createView.apply(values.get(index + 1));
+                row.addView(second, new LinearLayout.LayoutParams(0, -2, 1f));
+            } else {
+                row.addView(new Space(requireContext()), new LinearLayout.LayoutParams(0, 1, 1f));
+            }
+        }
     }
     private void openCampaign(String id) {
         Bundle args = new Bundle(); args.putString("campaignId", id);
@@ -169,4 +210,5 @@ public class GuestHomeFragment extends Fragment {
         Navigation.findNavController(requireView()).navigate(
                 R.id.action_guestHomeFragment_to_postDetailFragment, args);
     }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 }
