@@ -23,6 +23,7 @@ public class PostViewModel extends ViewModel {
     public LiveData<Boolean> getHasMore() { return hasMore; }
     public LiveData<List<Post>> getFeed() { return repository.observePublishedPosts(); }
     public LiveData<List<Post>> getSellerPosts() { return repository.observeSellerPosts(currentUserId()); }
+    public LiveData<Post> observePost(String postId) { return repository.observePost(postId); }
     public boolean isAuthenticated() { return authRepository.isAuthenticated(); }
     public void refreshFeed() { refreshFeed(true); }
     public void loadNextPage() { if (Boolean.TRUE.equals(hasMore.getValue())) refreshFeed(false); }

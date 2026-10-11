@@ -7,6 +7,8 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -20,7 +22,7 @@ import java.util.Arrays;
 
 public class PostEditorFragment extends Fragment {
     private PostViewModel viewModel; private TextInputEditText title, content, campaign, images, products;
-    private Spinner urgency; private String postId = ""; private boolean populated;
+    private Spinner urgency; private String postId = ""; private boolean dirty, binding;
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         return inflater.inflate(R.layout.fragment_post_editor, parent, false);
@@ -32,8 +34,27 @@ public class PostEditorFragment extends Fragment {
         urgency.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item,
                 Arrays.asList(UrgencyLevel.values())));
         viewModel = new ViewModelProvider(this, new PostViewModelFactory(requireContext())).get(PostViewModel.class);
+        postId = getArguments() == null ? "" : getArguments().getString("postId", "");
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!binding) dirty = true;
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        for (TextInputEditText input : new TextInputEditText[]{title, content, campaign, images, products})
+            input.addTextChangedListener(watcher);
+        boolean[] urgencyInitialized = {false};
+        urgency.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent,
+                    View selected, int position, long itemId) {
+                if (!urgencyInitialized[0]) urgencyInitialized[0] = true;
+                else if (!binding) dirty = true;
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
         viewModel.getState().observe(getViewLifecycleOwner(), value -> {
-            if (value.getStatus() == PostScreenState.Status.POST && !populated) populate(value.getPost());
+            if (value.getStatus() == PostScreenState.Status.POST && !dirty) populate(value.getPost());
             else if (value.getStatus() == PostScreenState.Status.SAVED) {
                 Toast.makeText(requireContext(), value.getMessage(), Toast.LENGTH_SHORT).show();
                 Navigation.findNavController(view).navigateUp();
@@ -43,13 +64,19 @@ public class PostEditorFragment extends Fragment {
         });
         view.findViewById(R.id.savePostDraftButton).setOnClickListener(v -> save(false));
         view.findViewById(R.id.submitPostButton).setOnClickListener(v -> save(true));
-        postId = getArguments() == null ? "" : getArguments().getString("postId", "");
-        if (!postId.isEmpty()) viewModel.loadPost(postId);
+        if (!postId.isEmpty()) {
+            viewModel.observePost(postId).observe(getViewLifecycleOwner(), value -> {
+                if (value != null && !dirty) populate(value);
+            });
+            viewModel.loadPost(postId);
+        }
     }
     private void populate(Post post) {
-        populated = true; title.setText(post.getTitle()); content.setText(post.getContent());
+        binding = true;
+        title.setText(post.getTitle()); content.setText(post.getContent());
         campaign.setText(post.getCampaignId()); images.setText(String.join("\n", post.getImageUrls()));
         products.setText(String.join("\n", post.getLinkedProductIds())); urgency.setSelection(post.getUrgencyLevel().ordinal());
+        binding = false;
     }
     private void save(boolean submit) {
         viewModel.savePost(postId, text(campaign), text(title), text(content), text(images),

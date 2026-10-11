@@ -10,6 +10,8 @@ import android.widget.CheckBox;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -28,6 +30,7 @@ public class AddressEditorFragment extends Fragment {
     private TextInputEditText name, phone, province, district, ward, street;
     private RadioGroup typeGroup; private CheckBox defaultCheck; private TextView locationText;
     private String id = ""; private double latitude, longitude;
+    private boolean dirty, binding;
     private final ActivityResultLauncher<String[]> permissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissionResult);
 
@@ -45,10 +48,39 @@ public class AddressEditorFragment extends Fragment {
         viewModel = new ViewModelProvider(this, new ProfileViewModelFactory(requireContext()))
                 .get(ProfileViewModel.class);
         viewModel.getState().observe(getViewLifecycleOwner(), this::render);
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!binding) dirty = true;
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        name.addTextChangedListener(watcher); phone.addTextChangedListener(watcher);
+        province.addTextChangedListener(watcher); district.addTextChangedListener(watcher);
+        ward.addTextChangedListener(watcher); street.addTextChangedListener(watcher);
+        defaultCheck.setOnCheckedChangeListener((button, checked) -> { if (!binding) dirty = true; });
+        typeGroup.setOnCheckedChangeListener((group, checkedId) -> { if (!binding) dirty = true; });
+        if (!id.isEmpty()) viewModel.observeAddress(id).observe(getViewLifecycleOwner(), value -> {
+            if (value != null && !dirty) populate(value);
+        });
         view.findViewById(R.id.useAddressLocationButton).setOnClickListener(v -> requestLocation());
         view.findViewById(R.id.saveAddressButton).setOnClickListener(v -> viewModel.saveAddress(
                 id, text(name), text(phone), text(province), text(district), text(ward), text(street),
                 latitude, longitude, selectedType(), defaultCheck.isChecked()));
+    }
+
+    private void populate(com.rescuefarm.domain.model.Address value) {
+        binding = true;
+        name.setText(value.getReceiverName()); phone.setText(value.getReceiverPhone());
+        province.setText(value.getProvince()); district.setText(value.getDistrict());
+        ward.setText(value.getWard()); street.setText(value.getStreet());
+        latitude = value.getLatitude(); longitude = value.getLongitude();
+        defaultCheck.setChecked(value.isDefault());
+        if (value.getType() == AddressType.WORK) typeGroup.check(R.id.addressTypeWork);
+        else if (value.getType() == AddressType.OTHER) typeGroup.check(R.id.addressTypeOther);
+        else typeGroup.check(R.id.addressTypeHome);
+        binding = false;
+        showCoordinates();
     }
 
     private void readArguments() {

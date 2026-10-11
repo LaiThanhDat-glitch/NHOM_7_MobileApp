@@ -13,6 +13,12 @@ public class UnavailableUserRepository implements UserRepository {
     private static final String MESSAGE = "Firebase chưa được cấu hình cho chức năng hồ sơ.";
 
     @Override public LiveData<User> observeUser(String userId) { return new MutableLiveData<>(); }
+    @Override public LiveData<java.util.List<Address>> observeAddresses(String customerId) {
+        return new MutableLiveData<>(new java.util.ArrayList<>());
+    }
+    @Override public LiveData<Address> observeAddress(String customerId, String addressId) {
+        return new MutableLiveData<>();
+    }
     @Override public void getUser(String userId, UserCallback callback) { unavailable(callback); }
     @Override public void createRegistrationProfile(String userId, String email, String fullName,
             String phone, String avatarUrl, UserRole role, CustomerType customerType,
@@ -37,6 +43,9 @@ public class UnavailableUserRepository implements UserRepository {
     }
     @Override public void getSellerApplication(String sellerId, ApplicationCallback callback) {
         callback.onError(ProfileError.UNKNOWN, MESSAGE);
+    }
+    @Override public LiveData<SellerApplication> observeSellerApplication(String sellerId) {
+        return new MutableLiveData<>();
     }
     @Override public void submitSellerApplication(String sellerId, SellerApplication application,
             ApplicationCallback callback) { callback.onError(ProfileError.UNKNOWN, MESSAGE); }

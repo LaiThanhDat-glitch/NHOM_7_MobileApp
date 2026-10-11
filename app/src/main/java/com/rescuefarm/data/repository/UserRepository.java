@@ -47,6 +47,8 @@ public interface UserRepository {
     }
 
     LiveData<User> observeUser(String userId);
+    LiveData<List<Address>> observeAddresses(String customerId);
+    LiveData<Address> observeAddress(String customerId, String addressId);
     void getUser(String userId, UserCallback callback);
     void createRegistrationProfile(
             String userId,
@@ -83,6 +85,7 @@ public interface UserRepository {
     void setDefaultAddress(String customerId, String addressId, ActionCallback callback);
     void deleteAddress(String customerId, String addressId, ActionCallback callback);
     void getSellerApplication(String sellerId, ApplicationCallback callback);
+    LiveData<SellerApplication> observeSellerApplication(String sellerId);
     void submitSellerApplication(
             String sellerId,
             SellerApplication application,

@@ -9,6 +9,8 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -30,6 +32,7 @@ public class PromotionEditorFragment extends Fragment {
     private EditText end;
     private SwitchMaterial active;
     private String productId;
+    private boolean dirty, binding;
 
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,
             @Nullable ViewGroup parent, @Nullable Bundle state) {
@@ -53,6 +56,25 @@ public class PromotionEditorFragment extends Fragment {
         viewModel = new ViewModelProvider(this, new ProductViewModelFactory(requireContext()))
                 .get(ProductViewModel.class);
         viewModel.getPromotion().observe(getViewLifecycleOwner(), this::render);
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!binding) dirty = true;
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        value.addTextChangedListener(watcher); tiers.addTextChangedListener(watcher);
+        start.addTextChangedListener(watcher); end.addTextChangedListener(watcher);
+        active.setOnCheckedChangeListener((button, checked) -> { if (!binding) dirty = true; });
+        boolean[] typeInitialized = {false};
+        type.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View selected,
+                    int position, long itemId) {
+                if (!typeInitialized[0]) typeInitialized[0] = true;
+                else if (!binding) dirty = true;
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
         viewModel.getState().observe(getViewLifecycleOwner(), screen -> {
             if (screen.getStatus() == ProductScreenState.Status.ERROR) {
                 Toast.makeText(requireContext(), screen.getMessage(), Toast.LENGTH_LONG).show();
@@ -64,7 +86,10 @@ public class PromotionEditorFragment extends Fragment {
         if (productId.isEmpty()) {
             Toast.makeText(requireContext(), "Thiếu productId.", Toast.LENGTH_LONG).show();
             view.findViewById(R.id.savePromotionButton).setEnabled(false);
-        } else viewModel.loadPromotion(productId);
+        } else {
+            viewModel.observePromotion(productId).observe(getViewLifecycleOwner(), this::render);
+            viewModel.loadPromotion(productId);
+        }
     }
 
     private void save() {
@@ -74,7 +99,8 @@ public class PromotionEditorFragment extends Fragment {
     }
 
     private void render(Promotion promotion) {
-        if (promotion == null) return;
+        if (promotion == null || dirty) return;
+        binding = true;
         type.setSelection(promotion.getType().ordinal());
         value.setText(formatNumber(promotion.getValue()));
         StringBuilder tierText = new StringBuilder();
@@ -87,6 +113,7 @@ public class PromotionEditorFragment extends Fragment {
         start.setText(date.format(promotion.getStartDate()));
         end.setText(date.format(promotion.getEndDate()));
         active.setChecked(promotion.isActive());
+        binding = false;
     }
 
     private static String formatNumber(double number) {

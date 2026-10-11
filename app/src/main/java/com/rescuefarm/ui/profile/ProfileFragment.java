@@ -60,6 +60,9 @@ public class ProfileFragment extends Fragment {
                 .get(ProfileViewModel.class);
         view.findViewById(R.id.logoutButton).setOnClickListener(unused -> confirmSignOut());
         viewModel.getState().observe(getViewLifecycleOwner(), value -> render(value));
+        viewModel.observeProfile().observe(getViewLifecycleOwner(), user -> {
+            if (user != null) renderProfile(user);
+        });
         viewModel.loadProfile();
     }
 
@@ -85,7 +88,11 @@ public class ProfileFragment extends Fragment {
             Toast.makeText(requireContext(), state.getMessage(), Toast.LENGTH_LONG).show(); return;
         }
         if (state.getStatus() != ProfileScreenState.Status.PROFILE) return;
-        User user = state.getUser();
+        renderProfile(state.getUser());
+    }
+
+    private void renderProfile(User user) {
+        if (user == null) return;
         nameView.setText(user.getFullName()); emailView.setText(user.getEmail());
         String avatarUrl = user.getAvatarUrl();
         if (avatarUrl != null && !avatarUrl.trim().isEmpty()) {

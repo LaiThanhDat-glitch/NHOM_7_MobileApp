@@ -41,6 +41,12 @@ public class ProductViewModel extends ViewModel {
     public LiveData<List<Product>> getSellerProducts() {
         return repository.observeSellerProducts(currentUserId());
     }
+    public LiveData<Product> observeProduct(String productId) {
+        return repository.observeProduct(productId);
+    }
+    public LiveData<Promotion> observePromotion(String productId) {
+        return repository.observePromotion(productId);
+    }
     public LiveData<List<ProductBatch>> getBatches(String productId) {
         return repository.observeBatches(productId);
     }

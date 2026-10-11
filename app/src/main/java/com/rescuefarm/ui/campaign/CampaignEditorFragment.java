@@ -7,6 +7,8 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -25,6 +27,7 @@ public class CampaignEditorFragment extends Fragment {
     private String id = ""; private CampaignViewModel viewModel;
     private TextInputEditText title, description, targets, start, end, latitude, longitude, locationName;
     private Spinner reason, mode;
+    private boolean dirty, binding;
     @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         return inflater.inflate(R.layout.fragment_campaign_editor, parent, false);
@@ -39,8 +42,19 @@ public class CampaignEditorFragment extends Fragment {
         mode.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, RescueMode.values()));
         id = getArguments() == null ? "" : getArguments().getString("campaignId", "");
         viewModel = new ViewModelProvider(this, new CampaignViewModelFactory(requireContext())).get(CampaignViewModel.class);
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!binding) dirty = true;
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        for (TextInputEditText input : new TextInputEditText[]{title, description, targets, start, end,
+                latitude, longitude, locationName}) input.addTextChangedListener(watcher);
+        installSpinnerDirtyListener(reason);
+        installSpinnerDirtyListener(mode);
         viewModel.getState().observe(getViewLifecycleOwner(), value -> {
-            if (value.getStatus() == CampaignScreenState.Status.CAMPAIGN) populate(value.getCampaign());
+            if (value.getStatus() == CampaignScreenState.Status.CAMPAIGN && !dirty) populate(value.getCampaign());
             else if (value.getStatus() == CampaignScreenState.Status.SAVED) {
                 Toast.makeText(requireContext(), value.getMessage(), Toast.LENGTH_SHORT).show();
                 NavHostFragment.findNavController(this).popBackStack();
@@ -49,14 +63,31 @@ public class CampaignEditorFragment extends Fragment {
         });
         view.findViewById(R.id.saveCampaignDraftButton).setOnClickListener(v -> save(false));
         view.findViewById(R.id.submitCampaignButton).setOnClickListener(v -> save(true));
-        if (!id.isEmpty()) viewModel.load(id);
+        if (!id.isEmpty()) {
+            viewModel.observeCampaign(id).observe(getViewLifecycleOwner(), value -> {
+                if (value != null && !dirty) populate(value);
+            });
+            viewModel.load(id);
+        }
     }
     private void save(boolean submit) {
         viewModel.save(id, text(title), text(description), (RescueReason) reason.getSelectedItem(),
                 (RescueMode) mode.getSelectedItem(), text(targets), text(start), text(end),
                 text(latitude), text(longitude), text(locationName), submit);
     }
+    private void installSpinnerDirtyListener(Spinner spinner) {
+        boolean[] initialized = {false};
+        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent,
+                    View selected, int position, long itemId) {
+                if (!initialized[0]) initialized[0] = true;
+                else if (!binding) dirty = true;
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
+    }
     private void populate(RescueCampaign value) {
+        binding = true;
         title.setText(value.getTitle()); description.setText(value.getDescription());
         reason.setSelection(value.getRescueReason().ordinal()); mode.setSelection(value.getRescueMode().ordinal());
         StringBuilder batchText = new StringBuilder();
@@ -69,6 +100,7 @@ public class CampaignEditorFragment extends Fragment {
         start.setText(format.format(value.getStartDate())); end.setText(format.format(value.getEndDate()));
         latitude.setText(String.valueOf(value.getLatitude())); longitude.setText(String.valueOf(value.getLongitude()));
         locationName.setText(value.getLocationName());
+        binding = false;
     }
     private static String text(TextInputEditText value) {
         return value.getText() == null ? "" : value.getText().toString();

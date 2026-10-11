@@ -8,7 +8,9 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QuerySnapshot;
+import androidx.lifecycle.LiveData;
 import com.rescuefarm.data.repository.AdminRepository;
 import com.rescuefarm.data.repository.admin.AdminDashboardSnapshot;
 import com.rescuefarm.data.repository.admin.AdminListItem;
@@ -72,6 +74,36 @@ public final class FirebaseAdminRepository implements AdminRepository {
                     for (DocumentSnapshot document : snapshot.getDocuments()) result.add(mapItem(section, document));
                     callback.onSuccess(result);
                 }).addOnFailureListener(error -> fail(error, callback)), callback);
+    }
+
+    @Override public LiveData<List<AdminListItem>> observeSection(Section section, int limit) {
+        return new LiveData<List<AdminListItem>>() {
+            private ListenerRegistration registration;
+            private boolean active;
+            @Override protected void onActive() {
+                active = true;
+                if (section == null || section == Section.ANALYTICS || section.getCollection().isEmpty()) return;
+                ensureAdmin(() -> {
+                    if (!active) return;
+                    registration = db.collection(section.getCollection())
+                            .limit(Math.max(1, Math.min(100, limit)))
+                            .addSnapshotListener((snapshot, error) -> {
+                                if (error != null || snapshot == null) return;
+                                List<AdminListItem> result = new ArrayList<>();
+                                for (DocumentSnapshot document : snapshot.getDocuments())
+                                    result.add(mapItem(section, document));
+                                postValue(result);
+                            });
+                }, new ListCallback() {
+                    @Override public void onSuccess(List<AdminListItem> items) { }
+                    @Override public void onError(ErrorCode code, String message) { }
+                });
+            }
+            @Override protected void onInactive() {
+                active = false;
+                if (registration != null) { registration.remove(); registration = null; }
+            }
+        };
     }
 
     @Override public void transition(Section section, String resourceId, String targetStatus,
