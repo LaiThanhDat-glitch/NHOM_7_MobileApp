@@ -207,25 +207,17 @@ public class GuestHomeFragment extends Fragment {
         categorySection.setClipChildren(false);
         categorySection.setClipToPadding(false);
         if (values.isEmpty()) { categorySection.addView(renderer.message("Chưa có danh mục trong cache.")); return; }
-        for (int index = 0; index < values.size(); index += 2) {
-            LinearLayout column = new LinearLayout(requireContext());
-            column.setOrientation(LinearLayout.VERTICAL);
-            column.setClipChildren(false);
-            column.setClipToPadding(false);
-            LinearLayout.LayoutParams columnParams = new LinearLayout.LayoutParams(dp(76), -2);
-            columnParams.setMargins(0, 0, dp(4), 0);
-            categorySection.addView(column, columnParams);
-            for (int row = 0; row < 2 && index + row < values.size(); row++) {
-                Category category = values.get(index + row);
-                View tile = renderer.category(category, v -> {
-                    Bundle args = new Bundle();
-                    args.putString("categoryId", category.getId());
-                    DiscoveryBottomSheet bottomSheet = new DiscoveryBottomSheet();
-                    bottomSheet.setArguments(args);
-                    bottomSheet.show(getChildFragmentManager(), "DiscoveryBottomSheet");
-                });
-                column.addView(tile, new LinearLayout.LayoutParams(-1, dp(86)));
-            }
+        for (Category category : values) {
+            View tile = renderer.category(category, v -> {
+                Bundle args = new Bundle();
+                args.putString("categoryId", category.getId());
+                DiscoveryBottomSheet bottomSheet = new DiscoveryBottomSheet();
+                bottomSheet.setArguments(args);
+                bottomSheet.show(getChildFragmentManager(), "DiscoveryBottomSheet");
+            });
+            LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(dp(76), -2);
+            itemParams.setMargins(0, 0, dp(8), 0);
+            categorySection.addView(tile, itemParams);
         }
     }
 
