@@ -22,11 +22,21 @@
                             android:layout_height="wrap_content" android:text="@string/home_greeting_guest"
                             android:textColor="@android:color/white" android:textSize="15sp"
                             android:textStyle="bold" />
-                        <TextView android:id="@+id/homeLocationLabel" android:layout_width="match_parent"
-                            android:layout_height="wrap_content" android:layout_marginTop="3dp"
-                            android:drawablePadding="5dp" android:drawableStart="@drawable/ic_home_location"
-                            android:gravity="center_vertical" android:text="@string/home_location_default"
-                            android:textColor="@android:color/white" android:textSize="12sp" />
+                        <LinearLayout android:id="@+id/homeLocationContainer"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp" android:gravity="center_vertical"
+                            android:orientation="horizontal" android:clickable="true" android:focusable="true"
+                            android:background="?attr/selectableItemBackground"
+                            android:paddingTop="2dp" android:paddingBottom="2dp" android:paddingEnd="6dp">
+                            <TextView android:id="@+id/homeLocationLabel" android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:drawablePadding="5dp" android:drawableStart="@drawable/ic_home_location"
+                                android:gravity="center_vertical" android:text="@string/home_location_default"
+                                android:textColor="@android:color/white" android:textSize="12sp" />
+                            <ImageView android:layout_width="14dp" android:layout_height="14dp"
+                                android:layout_marginStart="4dp" android:src="@drawable/ic_arrow_forward"
+                                android:rotation="90" app:tint="@android:color/white" />
+                        </LinearLayout>
                     </LinearLayout>
                     <ImageButton android:id="@+id/notificationButton" android:layout_width="42dp"
                         android:layout_height="42dp" android:background="?attr/selectableItemBackgroundBorderless"

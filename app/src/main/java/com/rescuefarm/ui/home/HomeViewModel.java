@@ -49,6 +49,7 @@ public class HomeViewModel extends ViewModel {
     private DiscoveryQuery query = DiscoveryQuery.empty();
     private Double latitude;
     private Double longitude;
+    private String customLocationLabel = "";
     private HomeViewState.LocationState locationState = HomeViewState.LocationState.PERMISSION_REQUIRED;
     private boolean refreshing;
     private int pendingRefreshes;
@@ -135,12 +136,50 @@ public class HomeViewModel extends ViewModel {
                 latitude = valueLatitude; longitude = valueLongitude;
                 syncSellerLocationSources();
                 locationState = HomeViewState.LocationState.AVAILABLE;
-                message = "Đã sắp xếp điểm giải cứu gần vị trí hiện tại."; publish();
+                message = "Đã sắp xếp điểm giải cứu gần vị trí hiện tại.";
+                if (customLocationLabel == null || customLocationLabel.isEmpty()
+                        || customLocationLabel.equals("Chọn vị trí để xem nông sản quanh bạn")) {
+                    customLocationLabel = "Đang xem nông sản gần vị trí của bạn";
+                }
+                locationProvider.reverseGeocode(valueLatitude, valueLongitude, new LocationProvider.GeocodeCallback() {
+                    @Override public void onAddressAvailable(LocationProvider.GeocodedAddress address) {
+                        String name = formatAddress(address);
+                        if (!name.isEmpty()) {
+                            customLocationLabel = name;
+                            publish();
+                        }
+                    }
+                    @Override public void onGeocodeUnavailable(String error) { }
+                });
+                publish();
             }
             @Override public void onLocationUnavailable(String value) {
                 locationState = HomeViewState.LocationState.UNAVAILABLE; message = value; publish();
             }
         });
+    }
+
+    public void setCustomLocation(double valueLatitude, double valueLongitude, String label) {
+        latitude = valueLatitude; longitude = valueLongitude;
+        customLocationLabel = label == null || label.trim().isEmpty() ? "Vị trí đã chọn" : label.trim();
+        syncSellerLocationSources();
+        locationState = HomeViewState.LocationState.AVAILABLE;
+        message = "Đã chọn vị trí: " + customLocationLabel;
+        publish();
+    }
+
+    private String formatAddress(LocationProvider.GeocodedAddress address) {
+        if (address == null) return "";
+        String district = address.getDistrict() != null ? address.getDistrict().trim() : "";
+        String province = address.getProvince() != null ? address.getProvince().trim() : "";
+        if (!district.isEmpty() && !province.isEmpty()) {
+            return district + ", " + province;
+        } else if (!province.isEmpty()) {
+            return province;
+        } else if (!district.isEmpty()) {
+            return district;
+        }
+        return "";
     }
 
     public void onLocationPermissionDenied() {
@@ -224,7 +263,7 @@ public class HomeViewModel extends ViewModel {
     private void publish() {
         homeState.postValue(contentBuilder.build(banners, products, campaigns, categories,
                 productBatches, latitude, longitude, new Date(), locationState,
-                refreshing, message, freshness));
+                refreshing, message, freshness, customLocationLabel));
         publishSearch();
     }
     public void refreshTimeSensitiveContent() { publish(); }

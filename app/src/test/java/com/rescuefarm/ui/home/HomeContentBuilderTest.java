@@ -75,6 +75,16 @@ public class HomeContentBuilderTest {
         assertTrue(state.getNearExpiry().isEmpty());
     }
 
+    @Test public void customLocationLabelIsPreservedInViewState() {
+        HomeViewState state = new HomeContentBuilder().build(Collections.emptyList(),
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                Collections.emptyMap(), 10.7769D, 106.7009D, new Date(),
+                HomeViewState.LocationState.AVAILABLE, false, "OK",
+                HomeViewState.DataFreshness.FRESH, "TP. Hồ Chí Minh");
+        assertEquals("TP. Hồ Chí Minh", state.getLocationLabel());
+        assertEquals(HomeViewState.LocationState.AVAILABLE, state.getLocationState());
+    }
+
     private com.rescuefarm.domain.model.Product product(String id) {
         return new com.rescuefarm.domain.model.Product(id, "seller", "category", "Rau " + id, "",
                 40000, 30000, "kg", "", "", Collections.emptyList(), com.rescuefarm.domain.enums.ProductStatus.ACTIVE);
