@@ -183,13 +183,26 @@ public class AndroidLocationProvider implements LocationProvider {
             return;
         }
         Address value = addresses.get(0);
-        String street = join(value.getSubThoroughfare(), value.getThoroughfare());
-        if (street.isEmpty()) { street = safe(value.getFeatureName()); }
+        String sub = safe(value.getSubThoroughfare());
+        String thoroughfare = safe(value.getThoroughfare());
+        String feature = safe(value.getFeatureName());
+        String street = "";
+        if (!sub.isEmpty() && !thoroughfare.isEmpty()) {
+            street = sub + " " + thoroughfare;
+        } else if (!feature.isEmpty() && !thoroughfare.isEmpty() && !feature.equalsIgnoreCase(thoroughfare)) {
+            street = feature + " " + thoroughfare;
+        } else if (!thoroughfare.isEmpty()) {
+            street = thoroughfare;
+        } else {
+            street = feature;
+        }
+        String fullAddress = value.getMaxAddressLineIndex() >= 0 ? safe(value.getAddressLine(0)) : "";
         callback.onAddressAvailable(new GeocodedAddress(
                 safe(value.getAdminArea()),
                 firstNonEmpty(value.getSubAdminArea(), value.getLocality()),
                 firstNonEmpty(value.getSubLocality(), value.getLocality()),
-                street
+                street,
+                fullAddress
         ));
     }
 

@@ -168,18 +168,91 @@ public class HomeViewModel extends ViewModel {
         publish();
     }
 
-    private String formatAddress(LocationProvider.GeocodedAddress address) {
+    public static String formatAddress(LocationProvider.GeocodedAddress address) {
         if (address == null) return "";
-        String district = address.getDistrict() != null ? address.getDistrict().trim() : "";
-        String province = address.getProvince() != null ? address.getProvince().trim() : "";
-        if (!district.isEmpty() && !province.isEmpty()) {
-            return district + ", " + province;
-        } else if (!province.isEmpty()) {
-            return province;
-        } else if (!district.isEmpty()) {
-            return district;
+        String street = safeStr(address.getStreet());
+        String ward = safeStr(address.getWard());
+        String district = safeStr(address.getDistrict());
+        String province = cleanProvinceName(address.getProvince());
+        String full = safeStr(address.getFullAddress());
+
+        // 1. Build detailed address from components: e.g. "111/8/8 Bình Lợi Trung, Hồ Chí Minh"
+        StringBuilder sb = new StringBuilder();
+        if (!street.isEmpty()) {
+            sb.append(street);
         }
-        return "";
+
+        // Add ward or district (e.g. "Bình Lợi Trung" or "Phường 13" or "Bình Thạnh")
+        String midArea = !ward.isEmpty() ? ward : district;
+        if (!midArea.isEmpty()) {
+            if (!sb.toString().toLowerCase(java.util.Locale.ROOT).contains(midArea.toLowerCase(java.util.Locale.ROOT))) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append(midArea);
+            }
+        }
+
+        // Add province / city
+        if (!province.isEmpty()) {
+            if (!sb.toString().toLowerCase(java.util.Locale.ROOT).contains(province.toLowerCase(java.util.Locale.ROOT))) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append(province);
+            }
+        }
+
+        String result = sb.toString();
+
+        // 2. If components didn't yield street, but fullAddress is available, use cleaned fullAddress
+        if (result.isEmpty() || street.isEmpty()) {
+            if (!full.isEmpty()) {
+                String cleanedFull = cleanFullAddress(full);
+                if (!cleanedFull.isEmpty()) {
+                    result = cleanedFull;
+                }
+            }
+        }
+
+        if (result.isEmpty()) {
+            return !district.isEmpty() ? district : province;
+        }
+
+        // 3. If address is very long (> 42 chars), optimize layout by condensing or truncating with "…"
+        if (result.length() > 42 && !street.isEmpty() && !province.isEmpty()) {
+            String compact = street + ", " + province;
+            if (compact.length() <= 42) {
+                return compact;
+            }
+            return compact.substring(0, 39).trim() + "…";
+        } else if (result.length() > 42) {
+            return result.substring(0, 39).trim() + "…";
+        }
+
+        return result;
+    }
+
+    private static String safeStr(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String cleanProvinceName(String province) {
+        if (province == null) return "";
+        String p = province.trim();
+        if (p.startsWith("Thành phố ")) p = p.substring("Thành phố ".length());
+        else if (p.startsWith("Tỉnh ")) p = p.substring("Tỉnh ".length());
+        else if (p.startsWith("TP. ")) p = p.substring("TP. ".length());
+        else if (p.startsWith("TP ")) p = p.substring("TP ".length());
+        return p.trim();
+    }
+
+    private static String cleanFullAddress(String full) {
+        if (full == null) return "";
+        String f = full.trim();
+        if (f.endsWith(", Việt Nam")) f = f.substring(0, f.length() - ", Việt Nam".length());
+        else if (f.endsWith(", Vietnam")) f = f.substring(0, f.length() - ", Vietnam".length());
+        else if (f.endsWith(", VN")) f = f.substring(0, f.length() - ", VN".length());
+        f = f.replaceAll("\\s+\\d{5,6}(?=(,|$))", "");
+        f = f.replace("Thành phố Hồ Chí Minh", "Hồ Chí Minh");
+        f = f.replace("TP. Hồ Chí Minh", "Hồ Chí Minh");
+        return f.trim();
     }
 
     public void onLocationPermissionDenied() {

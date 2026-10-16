@@ -85,6 +85,22 @@ public class HomeContentBuilderTest {
         assertEquals(HomeViewState.LocationState.AVAILABLE, state.getLocationState());
     }
 
+    @Test public void formatAddress_formatsStreetWardAndProvinceAccurately() {
+        com.rescuefarm.service.location.LocationProvider.GeocodedAddress address =
+                new com.rescuefarm.service.location.LocationProvider.GeocodedAddress(
+                        "Thành phố Hồ Chí Minh", "Bình Thạnh", "Bình Lợi Trung", "111/8/8");
+        String formatted = HomeViewModel.formatAddress(address);
+        assertEquals("111/8/8, Bình Lợi Trung, Hồ Chí Minh", formatted);
+    }
+
+    @Test public void formatAddress_shortensLongAddressWithEllipsisOrCompact() {
+        com.rescuefarm.service.location.LocationProvider.GeocodedAddress address =
+                new com.rescuefarm.service.location.LocationProvider.GeocodedAddress(
+                        "Hồ Chí Minh", "Bình Thạnh", "Phường 13", "111/8/2 Đ. Đặng Thuỳ Trâm");
+        String formatted = HomeViewModel.formatAddress(address);
+        assertEquals("111/8/2 Đ. Đặng Thuỳ Trâm, Hồ Chí Minh", formatted);
+    }
+
     private com.rescuefarm.domain.model.Product product(String id) {
         return new com.rescuefarm.domain.model.Product(id, "seller", "category", "Rau " + id, "",
                 40000, 30000, "kg", "", "", Collections.emptyList(), com.rescuefarm.domain.enums.ProductStatus.ACTIVE);
