@@ -58,6 +58,14 @@ public class AndroidLocationProvider implements LocationProvider {
             return;
         }
 
+        // Check if hardware GPS provider already has a freshly updated location (e.g. from emulator SET LOCATION)
+        android.location.Location hardwareLoc = getHardwareLastKnownLocation();
+        if (hardwareLoc != null && isValidCoordinate(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())
+                && !isEmulatorDefaultLocation(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())) {
+            deliverValidLocation(hardwareLoc, callback);
+            return;
+        }
+
         CurrentLocationRequest request = new CurrentLocationRequest.Builder()
                 .setPriority(hasFine
                         ? Priority.PRIORITY_HIGH_ACCURACY
@@ -66,7 +74,7 @@ public class AndroidLocationProvider implements LocationProvider {
                         ? Granularity.GRANULARITY_FINE
                         : Granularity.GRANULARITY_COARSE)
                 .setDurationMillis(LOCATION_TIMEOUT_MILLIS)
-                .setMaxUpdateAgeMillis(60_000L)
+                .setMaxUpdateAgeMillis(0L)
                 .build();
 
         try {
@@ -74,7 +82,7 @@ public class AndroidLocationProvider implements LocationProvider {
             locationCancellation = new CancellationTokenSource();
             fusedClient.getCurrentLocation(request, locationCancellation.getToken())
                     .addOnSuccessListener(location -> {
-                        if (location != null) {
+                        if (location != null && (!isEmulatorDefaultLocation(location.getLatitude(), location.getLongitude()) || !isEmulatorEnvironment())) {
                             deliverValidLocation(location, callback);
                         } else {
                             fallbackToLastLocation(callback);
@@ -86,12 +94,47 @@ public class AndroidLocationProvider implements LocationProvider {
         }
     }
 
+    private android.location.Location getHardwareLastKnownLocation() {
+        try {
+            android.location.LocationManager lm = (android.location.LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+            if (lm == null) return null;
+            android.location.Location best = null;
+            for (String provider : lm.getProviders(true)) {
+                android.location.Location loc = lm.getLastKnownLocation(provider);
+                if (loc != null && isValidCoordinate(loc.getLatitude(), loc.getLongitude())) {
+                    if (!isEmulatorDefaultLocation(loc.getLatitude(), loc.getLongitude())) {
+                        if (best == null || loc.getTime() > best.getTime()) {
+                            best = loc;
+                        }
+                    } else if (best == null) {
+                        best = loc;
+                    }
+                }
+            }
+            return best;
+        } catch (SecurityException ignored) {
+            return null;
+        }
+    }
+
     private void fallbackToLastLocation(LocationCallback callback) {
+        // Try hardware last known location first
+        android.location.Location hardwareLoc = getHardwareLastKnownLocation();
+        if (hardwareLoc != null && isValidCoordinate(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())
+                && !isEmulatorDefaultLocation(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())) {
+            deliverValidLocation(hardwareLoc, callback);
+            return;
+        }
+
         try {
             fusedClient.getLastLocation()
                     .addOnSuccessListener(lastLoc -> {
-                        if (lastLoc != null) {
+                        if (lastLoc != null && isValidCoordinate(lastLoc.getLatitude(), lastLoc.getLongitude())
+                                && !isEmulatorDefaultLocation(lastLoc.getLatitude(), lastLoc.getLongitude())) {
                             deliverValidLocation(lastLoc, callback);
+                        } else if (hardwareLoc != null && isValidCoordinate(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())
+                                && !isEmulatorDefaultLocation(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())) {
+                            deliverValidLocation(hardwareLoc, callback);
                         } else {
                             if (isEmulatorEnvironment()) {
                                 callback.onLocationAvailable(10.7769D, 106.7009D);
@@ -101,7 +144,9 @@ public class AndroidLocationProvider implements LocationProvider {
                         }
                     })
                     .addOnFailureListener(e -> {
-                        if (isEmulatorEnvironment()) {
+                        if (hardwareLoc != null && !isEmulatorDefaultLocation(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())) {
+                            deliverValidLocation(hardwareLoc, callback);
+                        } else if (isEmulatorEnvironment()) {
                             callback.onLocationAvailable(10.7769D, 106.7009D);
                         } else {
                             callback.onLocationUnavailable("Dịch vụ vị trí tạm thời không khả dụng.");
@@ -118,9 +163,15 @@ public class AndroidLocationProvider implements LocationProvider {
             return;
         }
         if (isEmulatorDefaultLocation(location.getLatitude(), location.getLongitude())) {
-            // Android Studio emulator defaults to Mountain View, California (~37.42, -122.08).
-            // For Vietnamese rescue campaigns, automatically route to Ho Chi Minh City coordinates
-            // so emulator demonstrations work out of the box.
+            // Android Studio emulator defaults to Mountain View, California (~37.42, -122.08)
+            // if the user has not clicked 'SET LOCATION' in Extended Controls yet.
+            // Check if hardware GPS provider has a newer non-default location:
+            android.location.Location hardwareLoc = getHardwareLastKnownLocation();
+            if (hardwareLoc != null && isValidCoordinate(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())
+                    && !isEmulatorDefaultLocation(hardwareLoc.getLatitude(), hardwareLoc.getLongitude())) {
+                callback.onLocationAvailable(hardwareLoc.getLatitude(), hardwareLoc.getLongitude());
+                return;
+            }
             callback.onLocationAvailable(10.7769D, 106.7009D);
             return;
         }
