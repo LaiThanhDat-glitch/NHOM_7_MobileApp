@@ -126,6 +126,7 @@
     <string name="coordinates_format">Vĩ độ %1$.6f • Kinh độ %2$.6f</string>
     <string name="profile_map_loading">Đang tải bản đồ vị trí…</string>
     <string name="profile_map_unavailable">Không tải được bản đồ. Hãy kiểm tra kết nối mạng.</string>
+    <string name="profile_map_retry">Không tải được bản đồ. Nhấn để thử lại hoặc mở bản đồ bên ngoài bằng nút bên dưới.</string>
     <string name="save_action">Lưu thay đổi</string>
     <string name="address_list_title">Địa chỉ nhận hàng</string>
     <string name="add_address_action">Thêm địa chỉ</string>
@@ -189,7 +190,9 @@
     <string name="hide_product_action">Ẩn</string>
     <string name="product_editor_title">Thông tin sản phẩm</string>
     <string name="available_categories_label">Danh mục đang hoạt động</string>
-    <string name="category_id_label">Mã danh mục</string>
+    <string name="category_id_label">Danh mục</string>
+    <string name="category_selection_hint">Chọn một danh mục đang hoạt động.</string>
+    <string name="no_active_categories">Hiện chưa có danh mục đang hoạt động.</string>
     <string name="product_name_label">Tên sản phẩm</string>
     <string name="product_description_label">Mô tả</string>
     <string name="original_price_label">Giá gốc</string>

@@ -46,10 +46,17 @@ public class ProfileViewModel extends ViewModel {
                 : userRepository.observeSellerApplication(userId);
     }
     public boolean isAuthenticated() { return authRepository.isAuthenticated(); }
+    public LiveData<com.rescuefarm.data.repository.SellerStorefront> observeStorefront() {
+        String id = authRepository.getCurrentUserId();
+        return id == null ? new MutableLiveData<>() : userRepository.observePublicStorefront(id);
+    }
     public String getCurrentUserId() { return authRepository.getCurrentUserId(); }
 
     public void signOut() { authRepository.signOut(); }
-    public void signOut(AuthRepository.ActionCallback callback) { authRepository.signOut(callback); }
+    public void signOut(AuthRepository.ActionCallback callback) {
+        state.setValue(ProfileScreenState.loading());
+        authRepository.signOut(callback);
+    }
 
     public void loadProfile() {
         String userId = requireUserId(); if (userId == null) return;
@@ -74,21 +81,31 @@ public class ProfileViewModel extends ViewModel {
                 });
     }
 
+    public void updateBusinessProfile(String fullName, String phone, String avatarUrl,
+            double latitude, double longitude, String companyName, String taxCode) {
+        String validation = ProfileValidator.validateProfile(fullName, phone);
+        if (validation == null) validation = ProfileValidator.validateBusiness(companyName, taxCode);
+        if (validation != null) { state.setValue(ProfileScreenState.error(validation)); return; }
+        String userId = requireUserId(); if (userId == null) return;
+        state.setValue(ProfileScreenState.loading());
+        userRepository.updateBusinessProfile(userId, fullName, phone, avatarUrl, latitude, longitude, companyName, taxCode,
+                new UserRepository.UserCallback() {
+                    @Override public void onSuccess(User user) { state.postValue(ProfileScreenState.saved("Đã cập nhật hồ sơ doanh nghiệp.")); }
+                    @Override public void onError(UserRepository.ProfileError error, String message) { state.postValue(ProfileScreenState.error(message)); }
+                });
+    }
+
     public void updateSellerProfile(String representativeName, String shopName,
             String shopDescription, String shopAvatarUrl, String address, String bankCode,
             String bankAccountName, String bankAccountNumber, double latitude, double longitude) {
-        if (representativeName == null || representativeName.trim().length() < 2
-                || shopName == null || shopName.trim().length() < 2
-                || address == null || address.trim().length() < 5) {
-            state.setValue(ProfileScreenState.error(
-                    "Vui lòng nhập người đại diện, tên cửa hàng và địa chỉ kinh doanh."));
-            return;
-        }
+        String validation = ProfileValidator.validateSellerProfile(representativeName, shopName,
+                shopDescription, shopAvatarUrl, address, bankCode, bankAccountName, bankAccountNumber);
+        if (validation != null) { state.setValue(ProfileScreenState.error(validation)); return; }
         if (!Double.isFinite(latitude) || !Double.isFinite(longitude)
                 || latitude < -90D || latitude > 90D || longitude < -180D || longitude > 180D
                 || (latitude == 0D && longitude == 0D)) {
             state.setValue(ProfileScreenState.error(
-                    "Hãy lấy GPS cửa hàng hoặc nhập tọa độ hợp lệ trước khi lưu để tính phí giao hàng."));
+                    "Hãy lấy GPS tại cửa hàng trước khi lưu để tính phí giao hàng."));
             return;
         }
         String userId = requireUserId(); if (userId == null) return;

@@ -305,6 +305,8 @@ public class FirebaseProductRepository implements ProductRepository {
         List<String> previousImageUrls = new ArrayList<>();
         firestore.runTransaction(transaction -> {
             DocumentSnapshot existing = transaction.get(reference);
+            if (existing.exists() && !java.util.Objects.equals(existing.getString("unit"), saved.getUnit()))
+                throw new IllegalArgumentException("Không đổi đơn vị của sản phẩm đã tạo; hãy tạo sản phẩm mới để giữ đúng số liệu lịch sử.");
             previousImageUrls.clear();
             if (existing.exists()) {
                 Object oldImages = existing.get("imageUrls");
@@ -339,6 +341,26 @@ public class FirebaseProductRepository implements ProductRepository {
         }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
     }
 
+    @Override public void createProduct(Product product, ProductCallback callback) {
+        if (!online(callback, "Không thể lưu sản phẩm khi offline; thay đổi không được xếp hàng.")) return;
+        String sellerId = currentUserId();
+        if (sellerId == null) { callback.onError(ErrorCode.FORBIDDEN, "Vui lòng đăng nhập seller."); return; }
+        DocumentReference reference = firestore.collection(PRODUCTS).document(clean(product.getId()));
+        Product saved;
+        try { saved = copyProduct(reference.getId(), sellerId, product); }
+        catch (IllegalArgumentException error) {
+            callback.onError(ErrorCode.VALIDATION, error.getMessage()); return;
+        }
+        Map<String, Object> data = productMap(saved);
+        data.put("createdAt", FieldValue.serverTimestamp());
+        data.put("updatedAt", FieldValue.serverTimestamp());
+        reference.set(data).addOnSuccessListener(unused -> {
+            cacheExecutor.execute(() -> dao.replaceProduct(CatalogCacheMapper.toEntity(
+                    saved, System.currentTimeMillis())));
+            callback.onSuccess(saved);
+        }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
+    }
+
     @Override public void hideProduct(String productId, ActionCallback callback) {
         if (!online(callback, "Không thể ẩn sản phẩm khi offline; thay đổi không được xếp hàng.")) return;
         DocumentReference reference = firestore.collection(PRODUCTS).document(productId);
@@ -359,6 +381,22 @@ public class FirebaseProductRepository implements ProductRepository {
         DocumentReference batchRef = clean(batch.getId()).isEmpty()
                 ? firestore.collection(BATCHES).document()
                 : firestore.collection(BATCHES).document(batch.getId());
+        if (clean(batch.getId()).isEmpty()) {
+            ProductBatch saved = ProductBatch.restore(batchRef.getId(), batch.getProductId(), null,
+                    batch.getHarvestDate(), batch.getExpiryDate(), batch.getInitialQuantity(),
+                    batch.getInitialQuantity(), 0D, 0D, batch.getStatus(), 1L);
+            saved.updateDetails(batch.getHarvestDate(), batch.getExpiryDate(),
+                    batch.getInitialQuantity(), new Date());
+            Map<String, Object> data = batchMap(saved);
+            data.put("updatedAt", FieldValue.serverTimestamp());
+            data.put("createdAt", FieldValue.serverTimestamp());
+            batchRef.set(data).addOnSuccessListener(unused -> {
+                cacheExecutor.execute(() -> dao.replaceBatch(CatalogCacheMapper.toEntity(
+                        saved, System.currentTimeMillis())));
+                callback.onSuccess(saved);
+            }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
+            return;
+        }
         firestore.runTransaction(transaction -> {
             DocumentSnapshot productSnapshot = transaction.get(productRef);
             DocumentSnapshot existing = transaction.get(batchRef);
@@ -461,16 +499,20 @@ public class FirebaseProductRepository implements ProductRepository {
     @Override public LiveData<Promotion> observePromotion(String productId) {
         return new LiveData<Promotion>() {
             private ListenerRegistration registration;
-            @Override protected void onActive() {
-                registration = firestore.collection(PROMOTIONS).document(productId)
-                        .addSnapshotListener((snapshot, error) -> {
-                            if (error != null || snapshot == null) return;
-                            postValue(snapshot.exists() ? mapPromotion(snapshot) : null);
-                        });
+            private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+            private final Runnable retry = this::listen;
+            private void listen() {
+                if (!hasActiveObservers()) return;
+                if (registration != null) registration.remove();
+                registration = firestore.collection(PROMOTIONS).document(productId).addSnapshotListener((snapshot, error) -> {
+                    if (error != null || snapshot == null) {
+                        postValue(null); handler.removeCallbacks(retry); handler.postDelayed(retry, 60000L); return;
+                    }
+                    handler.removeCallbacks(retry); postValue(snapshot.exists() ? mapPromotion(snapshot) : null);
+                });
             }
-            @Override protected void onInactive() {
-                if (registration != null) { registration.remove(); registration = null; }
-            }
+            @Override protected void onActive() { listen(); }
+            @Override protected void onInactive() { handler.removeCallbacks(retry); if (registration != null) { registration.remove(); registration = null; } }
         };
     }
 
@@ -512,8 +554,9 @@ public class FirebaseProductRepository implements ProductRepository {
             if (!existing.exists()) data.put("createdAt", FieldValue.serverTimestamp());
             else if (existing.get("createdAt") != null) data.put("createdAt", existing.get("createdAt"));
             transaction.set(promotionRef, data);
+            if (candidate.isActive()) com.rescuefarm.service.notification.NotificationOutbox.enqueue(transaction, firestore, "PROMOTION", "PROMOTION", candidate.getProductId());
             return candidate;
-        }).addOnSuccessListener(saved -> { callback.onSuccess(saved); notifyPromotionCustomers(saved.getProductId()); })
+        }).addOnSuccessListener(saved -> { callback.onSuccess(saved); })
                 .addOnFailureListener(error -> notifyFailure(error, callback::onError));
     }
 
@@ -526,19 +569,10 @@ public class FirebaseProductRepository implements ProductRepository {
             DocumentSnapshot product = transaction.get(firestore.collection(PRODUCTS).document(productId));
             requireOwner(product);
             transaction.update(promotionRef, "active", active, "updatedAt", FieldValue.serverTimestamp());
+            if (active) com.rescuefarm.service.notification.NotificationOutbox.enqueue(transaction, firestore, "PROMOTION", "PROMOTION", productId);
             return null;
-        }).addOnSuccessListener(unused -> { callback.onSuccess(); if (active) notifyPromotionCustomers(productId); })
+        }).addOnSuccessListener(unused -> { callback.onSuccess(); })
                 .addOnFailureListener(error -> notifyFailure(error, callback::onError));
-    }
-
-    private void notifyPromotionCustomers(String productId) {
-        JSONObject request = new JSONObject();
-        try { request.put("type", "PROMOTION"); request.put("referenceId", productId); }
-        catch (org.json.JSONException ignored) { return; }
-        RenderBackendClient.post("/send-notification", request, new RenderBackendClient.Callback() {
-            @Override public void onSuccess(JSONObject response) { }
-            @Override public void onError(String message) { }
-        });
     }
 
     @Override public void getCartQuote(String productId, String batchId, CartQuoteCallback callback) {

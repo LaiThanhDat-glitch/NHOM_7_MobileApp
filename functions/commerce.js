@@ -1,5 +1,8 @@
 const express = require("express");
+const {normalizeUnit, campaignUnit} = require('./quantity-units');
+const {enqueueNotification} = require('./notification-outbox');
 const crypto = require("node:crypto");
+const {createCampaignLifecycle, readAllocations} = require('./campaign-lifecycle');
 
 const text = value => typeof value === "string" ? value.trim() : "";
 const hash = value => crypto.createHash("sha256").update(value).digest("hex");
@@ -57,8 +60,9 @@ function distanceKm(aLat, aLng, bLat, bLng) {
   return 6371.0088 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
 }
 
-function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyAdmins = null}) {
+function createCommerce({db, admin, authenticate, campaignLifecycle = null}) {
   const router = express.Router();
+  const lifecycle = campaignLifecycle || createCampaignLifecycle({db, admin, authenticate});
   const stamp = () => admin.firestore.FieldValue.serverTimestamp();
   const timestamp = millis => admin.firestore.Timestamp.fromMillis(millis);
 
@@ -98,15 +102,21 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
     if (campaignIds.length > 1 || (data.fulfillmentType === 'ON_SITE_RESCUE' && !campaignIds.length)) {
       throw error(409, "Nhận tại điểm giải cứu cần các lô thuộc cùng một chiến dịch đang hoạt động.");
     }
-    let campaign = null, campaignRef = null, campaignQuantity = 0;
+    let campaign = null, campaignRef = null, campaignQuantity = 0, allocation = null;
     if (campaignIds.length) {
       campaignRef = db.collection('campaigns').doc(campaignIds[0]);
       const c = await read(campaignRef);
       if (!c.exists || c.get('sellerId') !== sellerId || c.get('status') !== 'ACTIVE'
           || time(c.get('endDate')) <= now || time(c.get('startDate')) > now) throw error(409, "Chiến dịch chưa bắt đầu hoặc đã kết thúc.");
       campaign = {id: c.id, ...c.data()};
+      const unit = campaignUnit(rows.filter(row => text(row.batch.activeCampaignId)).map(row => row.product));
+      if (campaign.unitStatus !== 'VERIFIED' || normalizeUnit(campaign.quantityUnit) !== unit)
+        throw error(409, 'Đơn vị Campaign chưa được xác minh hoặc không khớp; cần đối soát trước khi đặt hàng.');
+      allocation = await readAllocations(read, db, c.id, campaign);
       for (const row of rows) if (text(row.batch.activeCampaignId)) {
-        if (number((campaign.batchTargets || {})[row.item.batchId], 0) < row.item.quantity) throw error(409, "Số lượng vượt phần phân bổ của chiến dịch.");
+        const remaining = number((campaign.batchTargets || {})[row.item.batchId], 0)
+          - (allocation.reserved[row.item.batchId] || 0) - (allocation.rescued[row.item.batchId] || 0);
+        if (remaining + 0.000001 < row.item.quantity) throw error(409, "Số lượng vượt phần phân bổ còn lại của lô trong chiến dịch.");
         campaignQuantity += row.item.quantity;
       }
       if (number(campaign.targetQuantity, 0) - number(campaign.reservedQuantity, 0)
@@ -118,10 +128,12 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
       }
     }
     let profile = null, paymentProfile = null, shippingFee = 0, distance = 0;
-    if (data.fulfillmentType === 'DELIVERY') {
-      const p = await read(db.collection('sellerPublicProfiles').doc(sellerId));
-      if (!p.exists) throw error(409, "Cửa hàng chưa khai báo thông tin nhận hàng/thanh toán.");
-      profile = p.data();
+    // Store pickup/shipping always comes from the public business profile,
+    // never from the seller's personal GPS or caller-supplied origin fields.
+    const store = await read(db.collection('sellerPublicProfiles').doc(sellerId));
+    if (store.exists) profile = store.data();
+    if (data.fulfillmentType === 'DELIVERY' && !profile) {
+      throw error(409, "Người bán chưa lưu địa chỉ và GPS cửa hàng trong Hồ sơ người bán.");
     }
     if (data.paymentMethod === 'BANK_TRANSFER') {
       const p = await read(db.collection('sellerPaymentProfiles').doc(sellerId));
@@ -130,9 +142,11 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
     }
     if (data.fulfillmentType === 'DELIVERY') {
       const c = await read(db.collection('appConfig').doc('shipping'));
-      if (!c.exists || !coordinates(data.latitude, data.longitude) || !coordinates(profile.latitude, profile.longitude)) {
-        throw error(409, "Thiếu tọa độ địa chỉ/cửa hàng hoặc biểu phí giao hàng.");
-      }
+      if (!c.exists) throw error(409, "Admin chưa cấu hình biểu phí giao hàng.");
+      if (!coordinates(data.latitude, data.longitude))
+        throw error(409, "Địa chỉ nhận hàng chưa có GPS. Hãy lấy GPS tại nơi nhận hàng.");
+      if (!coordinates(profile.latitude, profile.longitude))
+        throw error(409, "Người bán cần lấy GPS cửa hàng và lưu trong Hồ sơ người bán.");
       const config = c.data();
       if (!(number(config.baseFeeVnd) >= 0 && config.baseFeeVnd <= 1000000
           && number(config.perKmFeeVnd) >= 0 && config.perKmFeeVnd <= 1000000
@@ -148,8 +162,11 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
       unit: text(product.unit), subtotal: value.subtotal, finalUnitPrice: value.unit, originalSubtotal: value.originalSubtotal}));
     const subtotal = lines.reduce((sum, line) => sum + line.subtotal, 0);
     const originalSubtotal = lines.reduce((sum, line) => sum + line.originalSubtotal, 0);
-    return {rows, campaign, campaignRef, campaignQuantity, profile, paymentProfile, sellerId,
+    return {rows, campaign, campaignRef, campaignQuantity, allocation, profile, paymentProfile, sellerId,
       public: {lines, subtotal, originalSubtotal, totalDiscount: Math.max(0, originalSubtotal - subtotal), shippingFee,
+        sellerName: text(seller.get('fullName')), sellerAddress: profile ? text(profile.address) : '',
+        sellerLatitude: profile ? number(profile.latitude, 0) : 0,
+        sellerLongitude: profile ? number(profile.longitude, 0) : 0,
         distanceKm: distance, total: subtotal + shippingFee, campaignId: campaign ? campaign.id : '',
         campaignTitle: campaign ? text(campaign.title) : '', campaignLocationName: campaign ? text(campaign.locationName) : '',
         rescueMode: campaign ? campaign.rescueMode : '',
@@ -178,6 +195,7 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
     if (normalized.latitude < -90 || normalized.latitude > 90 || normalized.longitude < -180 || normalized.longitude > 180) throw error(400, "Tọa độ nhận hàng chưa hợp lệ.");
     const fingerprint = hash(JSON.stringify(normalized)), orderRef = db.collection('orders').doc(requestId);
     const receiptRef = db.collection('checkoutReceipts').doc(requestId);
+    await lifecycle.reconcileItems(items);
     const result = await db.runTransaction(async tx => {
       const existing = await tx.get(orderRef), receipt = await tx.get(receiptRef);
       if (existing.exists) {
@@ -208,6 +226,8 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
         ...normalized, subtotal: q.public.subtotal, quantityDiscount: 0, shippingFee: q.public.shippingFee,
         totalAmount: q.public.total, paymentStatus, status: 'PENDING', campaignReservedQuantity: q.campaignQuantity,
         batchReservations: Object.fromEntries(items.map(item => [item.batchId, item.quantity])),
+        campaignBatchReservations: Object.fromEntries(q.rows.filter(row => text(row.batch.activeCampaignId))
+          .map(row => [row.item.batchId, row.item.quantity])),
         inventoryFinalized: false, finalizedStatus: '', createdAt: stamp(), updatedAt: stamp()};
       delete order.items; order.receiverLatitude = normalized.latitude; order.receiverLongitude = normalized.longitude;
       delete order.latitude; delete order.longitude;
@@ -225,7 +245,7 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
         const item = row.item, batch = row.batch, p = row.product;
         tx.create(orderRef.collection('items').doc(item.batchId), {id: item.batchId, orderId: requestId,
           productId: item.productId, batchId: item.batchId, productNameSnapshot: text(p.name),
-          productImageSnapshot: Array.isArray(p.imageUrls) ? text(p.imageUrls[0]) : '', unitSnapshot: text(p.unit),
+          productImageSnapshot: Array.isArray(p.imageUrls) ? text(p.imageUrls[0]) : '', unitSnapshot: normalizeUnit(p.unit),
           originalPriceSnapshot: p.originalPrice, rescuePriceSnapshot: p.rescuePrice, finalPriceSnapshot: row.price.unit,
           quantity: item.quantity, subtotal: row.price.subtotal});
         tx.update(row.batchRef, {availableQuantity: batch.availableQuantity - item.quantity,
@@ -233,8 +253,13 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
           inventoryVersion: number(batch.inventoryVersion, 0) + 1, lastReservationOrderId: requestId,
           lastReservationQuantity: item.quantity, everOrdered: true, updatedAt: stamp()});
       }
-      if (q.campaign) tx.update(q.campaignRef, {reservedQuantity: q.campaign.reservedQuantity + q.campaignQuantity,
-        lastReservationOrderId: requestId, lastReservationQuantity: q.campaignQuantity, updatedAt: stamp()});
+      if (q.campaign) {
+        const reserved = {...q.allocation.reserved};
+        for (const [id, quantity] of Object.entries(order.campaignBatchReservations)) reserved[id] = (reserved[id] || 0) + quantity;
+        tx.update(q.campaignRef, {reservedQuantity: (q.campaign.reservedQuantity || 0) + q.campaignQuantity,
+          reservedByBatch: reserved, rescuedByBatch: q.allocation.rescued, allocationVersion: 1,
+          lastReservationOrderId: requestId, lastReservationQuantity: q.campaignQuantity, updatedAt: stamp()});
+      }
       const bank = q.paymentProfile || {};
       tx.create(db.collection('payments').doc(requestId), {id: requestId, orderId: requestId,
         method: normalized.paymentMethod, status: paymentStatus, amount: order.totalAmount, referenceCode: '',
@@ -244,6 +269,9 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
         qrUrl: normalized.paymentMethod === 'BANK_TRANSFER' ? text(bank.qrUrl) : '', paidAt: null, createdAt: stamp(), updatedAt: stamp()});
       if (normalized.fulfillmentType === 'DELIVERY') tx.create(db.collection('shipments').doc(requestId), {
         id: requestId, orderId: requestId, carrierName: '', trackingCode: '', status: 'PENDING',
+        pickupAddress: q.public.sellerAddress, pickupLatitude: q.public.sellerLatitude,
+        pickupLongitude: q.public.sellerLongitude, receiverAddress: normalized.receiverAddress,
+        receiverLatitude: normalized.latitude, receiverLongitude: normalized.longitude,
         distanceKm: q.public.distanceKm, shippingFee: q.public.shippingFee, createdAt: stamp(), updatedAt: stamp()});
       if (cart && cart.exists) {
         const quantities = new Map(items.map(item => [`${item.productId}::${item.batchId}`, item.quantity]));
@@ -260,28 +288,16 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
         body: 'Đơn hàng đang chờ cửa hàng xác nhận.', referenceId: requestId, orderStatus: 'PENDING',
         isRead: false, createdAt: stamp()});
       if (identity.ownerType === 'GUEST') tx.create(codeRef, {orderId: requestId, phoneHash: hash(receiverPhone), createdAt: stamp()});
+      enqueueNotification(tx, db, admin, `order_${requestId}_seller`, {kind: 'DIRECT', resourceType: 'ORDER', resourceId: requestId,
+        recipientUid: q.sellerId, decision: 'PENDING', title: 'Có đơn hàng mới', publicMessage: 'Có đơn hàng mới đang chờ cửa hàng xác nhận.'});
+      enqueueNotification(tx, db, admin, `order_${requestId}_admins`, {kind: 'ADMINS', resourceType: 'ORDER', resourceId: requestId});
+      if (identity.ownerType === 'CUSTOMER') enqueueNotification(tx, db, admin, `order_${requestId}_PENDING`, {
+        kind: 'DIRECT', resourceType: 'ORDER', resourceId: requestId, recipientUid: identity.ownerId, decision: 'PENDING', inboxId: `${requestId}_PENDING`});
       return {order, replay: false};
     });
     // Re-read committed server timestamps; never serialize FieldValue sentinels to Android.
     result.order = (await orderRef.get()).data();
     if (identity.ownerType === 'GUEST') result.accessToken = data.guestToken;
-    if (typeof notifyNewOrder === 'function' && !result.replay) {
-      try {
-        await notifyNewOrder(q.sellerId, requestId,
-          `Có đơn hàng mới ${str(result.order.orderCode)}`,
-          "Bạn vừa nhận được đơn hàng mới. Mở RescueFarm để xác nhận.");
-      } catch (notificationError) {
-        console.error("Seller order notification could not be delivered:", notificationError.message || notificationError);
-      }
-    }
-    if (typeof notifyAdmins === 'function' && !result.replay) {
-      try {
-        await notifyAdmins(requestId, `Đơn hàng mới ${str(result.order.orderCode)}`,
-          `Có đơn hàng mới từ ${identity.ownerType === 'CUSTOMER' ? 'Customer' : 'Guest'} cần theo dõi.`);
-      } catch (notificationError) {
-        console.error("Admin order notification could not be delivered:", notificationError.message || notificationError);
-      }
-    }
     return serialize(result);
   }
 
@@ -297,8 +313,12 @@ function createCommerce({db, admin, authenticate, notifyNewOrder = null, notifyA
   const route = (path, handler) => router.post(path, async (req, res, next) => {
     try { res.json(await handler(req)); } catch (failure) { next(failure); }
   });
-  route('/quoteCustomerCheckout', async req => { await authenticate(req, ['CUSTOMER']); return (await quote(ref => ref.get(), req.body || {})).public; });
-  route('/quoteGuestCheckout', async req => { await limit(req, 'guestQuote', 60); return (await quote(ref => ref.get(), req.body || {})).public; });
+  async function reconciledQuote(data) {
+    await lifecycle.reconcileItems(validateSelection(data));
+    return (await quote(ref => ref.get(), data)).public;
+  }
+  route('/quoteCustomerCheckout', async req => { await authenticate(req, ['CUSTOMER']); return reconciledQuote(req.body || {}); });
+  route('/quoteGuestCheckout', async req => { await limit(req, 'guestQuote', 60); return reconciledQuote(req.body || {}); });
   route('/checkoutCustomer', async req => {
     const caller = await authenticate(req, ['CUSTOMER']);
     return checkout(req.body || {}, {ownerType: 'CUSTOMER', ownerId: caller.uid});

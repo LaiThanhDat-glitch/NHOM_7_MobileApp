@@ -105,13 +105,37 @@ public class FirebaseUserRepository implements UserRepository {
         fields.put("fullName", clean(fullName)); fields.put("phone", clean(phone));
         fields.put("avatarUrl", clean(avatarUrl)); fields.put("latitude", latitude);
         fields.put("longitude", longitude); fields.put("updatedAt", FieldValue.serverTimestamp());
-        user(userId).get().addOnSuccessListener(previous -> user(userId).update(fields)
+        user(userId).get().addOnSuccessListener(previous -> {
+            if ("SELLER".equals(previous.getString("role"))) {
+                fields.remove("latitude"); fields.remove("longitude");
+            }
+            user(userId).update(fields)
                 .addOnSuccessListener(unused -> {
                     com.rescuefarm.service.media.CloudinaryAssetCleanup.deleteRemoved(
                             previous.getString("avatarUrl"), avatarUrl);
                     getUser(userId, callback);
-                }).addOnFailureListener(error -> notifyFailure(error, callback::onError)))
+                }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
+        })
                 .addOnFailureListener(error -> notifyFailure(error, callback::onError));
+    }
+
+    @Override public void updateBusinessProfile(String userId, String fullName, String phone, String avatarUrl,
+            double latitude, double longitude, String companyName, String taxCode, UserCallback callback) {
+        String validation = com.rescuefarm.service.profile.ProfileInputPolicy.business(companyName, taxCode);
+        if (validation == null) validation = com.rescuefarm.service.profile.ProfileInputPolicy.profile(fullName, phone);
+        if (validation != null) { callback.onError(ProfileError.VALIDATION, validation); return; }
+        firestore.runTransaction(tx -> {
+            DocumentSnapshot previous = tx.get(user(userId));
+            if (!"CUSTOMER".equals(previous.getString("role")) || !"BUSINESS".equals(previous.getString("customerType")))
+                throw new IllegalStateException("Chỉ tài khoản khách hàng doanh nghiệp được sửa thông tin này.");
+            Map<String,Object> fields = new HashMap<>();
+            fields.put("fullName", clean(fullName)); fields.put("phone", clean(phone)); fields.put("avatarUrl", clean(avatarUrl));
+            fields.put("latitude", latitude); fields.put("longitude", longitude); fields.put("companyName", clean(companyName));
+            fields.put("taxCode", clean(taxCode)); fields.put("updatedAt", FieldValue.serverTimestamp());
+            tx.update(user(userId), fields); return previous.getString("avatarUrl");
+        }).addOnSuccessListener(oldAvatar -> {
+            com.rescuefarm.service.media.CloudinaryAssetCleanup.deleteRemoved(oldAvatar, avatarUrl); getUser(userId, callback);
+        }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
     }
 
     @Override public void updateSellerProfile(String sellerId, String representativeName, String shopName,
@@ -144,16 +168,23 @@ public class FirebaseUserRepository implements UserRepository {
         paymentProfile.put("bankAccountName", clean(bankAccountName));
         paymentProfile.put("bankAccountNumber", clean(bankAccountNumber));
         paymentProfile.put("updatedAt", FieldValue.serverTimestamp());
-        user(sellerId).get().addOnSuccessListener(previous -> {
-            com.google.firebase.firestore.WriteBatch batch = firestore.batch();
-            batch.update(user(sellerId), fields);
-            batch.set(firestore.collection("sellerPublicProfiles").document(sellerId), publicProfile, com.google.firebase.firestore.SetOptions.merge());
-            batch.set(firestore.collection("sellerPaymentProfiles").document(sellerId), paymentProfile, com.google.firebase.firestore.SetOptions.merge());
-            batch.commit().addOnSuccessListener(unused -> {
-                    com.rescuefarm.service.media.CloudinaryAssetCleanup.deleteRemoved(
-                            previous.getString("shopAvatarUrl"), shopAvatarUrl);
-                    getUser(sellerId, callback);
-                }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
+        DocumentReference paymentReference = firestore.collection("sellerPaymentProfiles").document(sellerId);
+        firestore.runTransaction(transaction -> {
+            DocumentSnapshot previous = transaction.get(user(sellerId));
+            DocumentSnapshot previousPayment = transaction.get(paymentReference);
+            Map<String,Object> nextPayment = new HashMap<>(paymentProfile);
+            if (!clean(previousPayment.getString("bankCode")).equals(clean(bankCode))
+                    || !clean(previousPayment.getString("bankAccountName")).equals(clean(bankAccountName))
+                    || !clean(previousPayment.getString("bankAccountNumber")).equals(clean(bankAccountNumber)))
+                nextPayment.put("qrUrl", FieldValue.delete());
+            transaction.update(user(sellerId), fields);
+            transaction.set(firestore.collection("sellerPublicProfiles").document(sellerId), publicProfile,
+                    com.google.firebase.firestore.SetOptions.merge());
+            transaction.set(paymentReference, nextPayment, com.google.firebase.firestore.SetOptions.merge());
+            return previous.getString("shopAvatarUrl");
+        }).addOnSuccessListener(previousAvatar -> {
+            com.rescuefarm.service.media.CloudinaryAssetCleanup.deleteRemoved(previousAvatar, shopAvatarUrl);
+            getUser(sellerId, callback);
         }).addOnFailureListener(error -> notifyFailure(error, callback::onError));
     }
 
@@ -311,12 +342,12 @@ public class FirebaseUserRepository implements UserRepository {
             data.put("submittedAt", FieldValue.serverTimestamp());
             data.put("updatedAt", FieldValue.serverTimestamp());
             transaction.set(reference, data);
+            com.rescuefarm.service.notification.NotificationOutbox.enqueue(transaction, firestore, "ADMINS", "SELLER_APPLICATION", sellerId);
             return null;
         }).addOnSuccessListener(unused -> {
             com.rescuefarm.service.media.CloudinaryAssetCleanup.deleteRemoved(
                     previousProofUrl[0], application.getProofImageUrl());
-            com.rescuefarm.service.notification.AdminNotificationClient.notifyAdmins(
-                    "SELLER_APPLICATION", sellerId, null);
+
             getSellerApplication(sellerId, callback);
         })
                 .addOnFailureListener(error -> notifyFailure(error, callback::onError));
