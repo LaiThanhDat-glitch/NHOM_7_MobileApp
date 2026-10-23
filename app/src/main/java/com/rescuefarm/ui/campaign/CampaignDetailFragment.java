@@ -318,6 +318,8 @@ public class CampaignDetailFragment extends Fragment {
         ProgressBar progressBar = view.findViewById(R.id.campaignProgressBar);
         TextView percentText = view.findViewById(R.id.campaignProgressPercent);
         if (percentText != null) {
+            percentText.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(),
+                    com.rescuefarm.ui.common.CampaignProgressColors.forPercent(value.calculateProgress())));
             percentText.setText(String.format(Locale.getDefault(), "%d%%", progress));
         }
         com.rescuefarm.ui.common.RescueProgressUtils.applyProgressWithText(progressBar, percentText, progressPercent);
