@@ -51,6 +51,16 @@ public class CustomerOrderListFragment extends Fragment {
         guestLookupCard.setVisibility(signedIn ? View.GONE : View.VISIBLE);
         refresh.setVisibility(signedIn ? View.VISIBLE : View.GONE);
         login.setOnClickListener(v -> Navigation.findNavController(view).navigate(R.id.loginFragment));
+        if (!signedIn) {
+            com.rescuefarm.data.local.preferences.SharedPreferencesGuestSessionRepository session =
+                    new com.rescuefarm.data.local.preferences.SharedPreferencesGuestSessionRepository(requireContext());
+            if (codeInput.getText().toString().isEmpty() && !session.getLastGuestOrderCode().isEmpty()) {
+                codeInput.setText(session.getLastGuestOrderCode());
+            }
+            if (phoneInput.getText().toString().isEmpty() && !session.getLastGuestPhone().isEmpty()) {
+                phoneInput.setText(session.getLastGuestPhone());
+            }
+        }
 
         lookupButton.setOnClickListener(v -> {
             String code = codeInput.getText() == null ? "" : codeInput.getText().toString().trim();
