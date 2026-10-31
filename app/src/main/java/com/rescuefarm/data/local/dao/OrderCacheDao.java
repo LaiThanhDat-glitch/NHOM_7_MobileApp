@@ -19,6 +19,18 @@ public interface OrderCacheDao {
     @Query("SELECT * FROM order_cache WHERE id = :orderId LIMIT 1")
     OrderCacheEntity find(String orderId);
 
+    @Query("SELECT * FROM order_cache WHERE (orderCode = :code OR id = :code) AND (receiverPhone = :phone OR :phone = '') LIMIT 1")
+    OrderCacheEntity findByCodeAndPhone(String code, String phone);
+
+    @Query("SELECT * FROM order_cache WHERE orderCode = :code OR id = :code LIMIT 1")
+    OrderCacheEntity findByCode(String code);
+
+    @Query("SELECT * FROM order_cache WHERE ownerType = 'GUEST' OR ownerId LIKE 'guest_%' ORDER BY createdAtEpochMillis DESC LIMIT :limit")
+    List<OrderCacheEntity> getRecentGuestOrders(int limit);
+
+    @Query("SELECT * FROM order_cache WHERE ownerType = 'GUEST' OR ownerId LIKE 'guest_%' ORDER BY createdAtEpochMillis DESC")
+    LiveData<List<OrderCacheEntity>> observeGuestOrders();
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void replaceOrders(List<OrderCacheEntity> orders);
 
