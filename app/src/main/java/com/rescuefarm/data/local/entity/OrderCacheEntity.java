@@ -6,7 +6,7 @@ import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
 @Entity(tableName = "order_cache", indices = {
-        @Index(value = "ownerId"), @Index(value = "sellerId")
+        @Index(value = "ownerId"), @Index(value = "sellerId"), @Index(value = "orderCode")
 })
 public class OrderCacheEntity {
     @PrimaryKey @NonNull public String id;
@@ -31,6 +31,9 @@ public class OrderCacheEntity {
     public String note;
     public boolean expiryReviewRequired;
     public String cancellationReason;
+    public String itemsSerialized;
+    public String paymentSerialized;
+    public String shipmentSerialized;
     public long createdAtEpochMillis;
     public long updatedAtEpochMillis;
     public long cachedAtEpochMillis;
