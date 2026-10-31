@@ -12,6 +12,7 @@ public class Payment {
         transferContent = content == null ? "" : content.trim();
     }
     public boolean usesAutomaticVerification() { return "SEPAY".equals(verificationProvider); }
+    public String getVerificationProvider() { return verificationProvider; }
     public String getTransferContent() { return transferContent; }
     public String resolveQrTransferContent(String legacyOrderCode) {
         if (method == PaymentMethod.BANK_TRANSFER)
