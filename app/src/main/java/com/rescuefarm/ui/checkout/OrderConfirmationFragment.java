@@ -235,7 +235,7 @@ public class OrderConfirmationFragment extends Fragment {
 
         String targetOrderId = item.getOrderId();
         // Nếu đã có accessToken trên thiết bị, mở ngay chi tiết đơn không cần chờ tra cứu
-        if (!targetOrderId.isEmpty() && !sessionRepo.getOrderAccessToken(targetOrderId).isEmpty()) {
+        if (!targetOrderId.isEmpty()) {
             orderId = targetOrderId;
             detailButton.setEnabled(true);
             openOrderDetail(targetOrderId);
