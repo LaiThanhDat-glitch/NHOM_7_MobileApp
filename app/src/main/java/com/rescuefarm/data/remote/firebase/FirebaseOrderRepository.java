@@ -71,7 +71,6 @@ public class FirebaseOrderRepository implements OrderRepository {
     private final Map<String, Integer> sellerLimits = new HashMap<>();
     private final java.util.Set<String> customerPagesLoading = new java.util.HashSet<>();
 
-
     private Query customerQuery(String ownerId) {
         return db.collection(ORDERS).whereEqualTo("ownerId", ownerId).whereEqualTo("ownerType", "CUSTOMER")
                 .orderBy(com.google.firebase.firestore.FieldPath.documentId()).limit(customerLimits.getOrDefault(ownerId, 12) + 1L);
@@ -195,9 +194,11 @@ public class FirebaseOrderRepository implements OrderRepository {
                             guestSession.saveRecentGuestOrder(child.getId(), child.getOrderCode(), child.getReceiverPhone(),
                                     child.getTotalAmount(), child.getStatus().name(), child.getPaymentMethod().name());
                         }
+                        Payment payment = response.has("payment") ? OrderJsonMapper.payment(response.optJSONObject("payment")) : null;
+                        Shipment shipment = response.has("shipment") ? OrderJsonMapper.shipment(response.optJSONObject("shipment")) : null;
                         cacheExecutor.execute(() -> {
                             if (guest) consumeGuestCartOnce(request);
-                            for (Order child : placed) orderDao.replaceOrder(OrderCacheMapper.toEntity(child, System.currentTimeMillis()));
+                            for (Order child : placed) orderDao.replaceOrder(OrderCacheMapper.toEntity(child, payment, shipment, System.currentTimeMillis()));
                             callback.onSuccess(order, replay);
                         });
                     } catch (Exception invalid) { callback.onError(ErrorCode.UNKNOWN, "Không đọc được kết quả đặt hàng. Hãy thử lại cùng yêu cầu."); }
@@ -231,7 +232,6 @@ public class FirebaseOrderRepository implements OrderRepository {
         });
     }
 
-
     @Override public void refreshOrders(String ownerId, ActionCallback callback){
         if(!network.isOnline()){callback.onError(ErrorCode.NETWORK,"Không thể tải đơn khi offline.");return;}
         db.collection(ORDERS).whereEqualTo("ownerId",ownerId)
@@ -260,43 +260,119 @@ public class FirebaseOrderRepository implements OrderRepository {
     @Override public boolean hasMoreSellerOrders(String sellerId) {
         synchronized (sellerOrderCursors) { return Boolean.TRUE.equals(sellerOrderHasMore.get(sellerId)); }
     }
-    @Override public void findGuestOrder(String code,String phone,OrderCallback callback){
+
+    @Override public void findGuestOrder(String code, String phone, OrderCallback callback) {
+        String c = clean(code);
+        String p = clean(phone);
+        if (!network.isOnline()) {
+            loadCachedGuestOrder(c, p, callback, "Đang ngoại tuyến. Không tìm thấy đơn đã lưu ngoại tuyến.");
+            return;
+        }
         try {
-            JSONObject request = new JSONObject().put("orderCode", clean(code))
-                    .put("receiverPhone", clean(phone));
+            JSONObject request = new JSONObject().put("orderCode", c)
+                    .put("receiverPhone", p);
             RenderBackendClient.postGuest("/lookupGuestOrder", request, new RenderBackendClient.Callback() {
                 @Override public void onSuccess(JSONObject response) {
                     try {
                         Order order = OrderJsonMapper.order(response.optJSONObject("order"));
                         guestSession.saveOrderAccessToken(order.getId(), response.optString("accessToken"));
-                        cache(order); callback.onSuccess(order, false);
+                        Payment payment = response.has("payment") ? OrderJsonMapper.payment(response.optJSONObject("payment")) : null;
+                        Shipment shipment = response.has("shipment") ? OrderJsonMapper.shipment(response.optJSONObject("shipment")) : null;
+                        cache(order, payment, shipment); callback.onSuccess(order, false);
                     } catch (Exception invalid) { callback.onError(ErrorCode.UNKNOWN, "Không đọc được đơn Guest từ máy chủ."); }
                 }
-                @Override public void onError(String message) { callback.onError(ErrorCode.NOT_FOUND, message); }
+                @Override public void onError(String message) {
+                    if (!network.isOnline() || (message != null && (message.contains("kết nối") || message.contains("mạng") || message.contains("timeout")))) {
+                        loadCachedGuestOrder(c, p, callback, message);
+                    } else {
+                        callback.onError(ErrorCode.NOT_FOUND, message);
+                    }
+                }
             });
         } catch (Exception invalid) { callback.onError(ErrorCode.VALIDATION, "Kiểm tra mã đơn và số điện thoại."); }
     }
 
+    private void loadCachedGuestOrder(String code, String phone, OrderCallback callback, String notFoundMsg) {
+        cacheExecutor.execute(() -> {
+            OrderCacheEntity cached = orderDao.findByCodeAndPhone(code, phone);
+            if (cached == null) cached = orderDao.findByCode(code);
+            if (cached != null) {
+                Order order = OrderCacheMapper.toDomain(cached);
+                callback.onSuccess(order, false);
+            } else {
+                callback.onError(ErrorCode.NOT_FOUND, notFoundMsg);
+            }
+        });
+    }
+
+    private void loadCachedOrder(String orderId, LifecycleCallback callback, String notFoundMsg) {
+        cacheExecutor.execute(() -> {
+            OrderCacheEntity entity = orderDao.find(orderId);
+            if (entity == null) entity = orderDao.findByCode(orderId);
+            if (entity != null) {
+                Order order = OrderCacheMapper.toDomain(entity);
+                Payment payment = OrderCacheMapper.toPaymentDomain(entity);
+                Shipment shipment = OrderCacheMapper.toShipmentDomain(entity);
+                callback.onSuccess(order, payment, shipment, false);
+            } else {
+                callback.onError(ErrorCode.NOT_FOUND, notFoundMsg);
+            }
+        });
+    }
+
     @Override public void getOrderItems(String orderId, ItemCallback callback) {
-        if (hasGuestAccess(orderId)) {
-            getGuestOrder(orderId, new LifecycleCallback() {
+        String id = clean(orderId);
+        if (!network.isOnline()) {
+            cacheExecutor.execute(() -> {
+                OrderCacheEntity entity = orderDao.find(id);
+                if (entity == null) entity = orderDao.findByCode(id);
+                if (entity != null) {
+                    Order order = OrderCacheMapper.toDomain(entity);
+                    if (order.getItems() != null && !order.getItems().isEmpty()) {
+                        callback.success(order.getItems());
+                        return;
+                    }
+                }
+                callback.error("Chưa có danh sách mặt hàng lưu ngoại tuyến.");
+            });
+            return;
+        }
+        if (hasGuestAccess(id)) {
+            getGuestOrder(id, new LifecycleCallback() {
                 public void onSuccess(Order order, Payment p, Shipment s, boolean replay) { callback.success(order.getItems()); }
                 public void onError(ErrorCode error, String message) { callback.error(message); }
             }); return;
         }
-        db.collection(ORDERS).document(orderId).collection(ITEMS).get()
+        db.collection(ORDERS).document(id).collection(ITEMS).get()
             .addOnSuccessListener(snapshot -> {
                 List<OrderItem> items = new ArrayList<>();
                 for (DocumentSnapshot d : snapshot.getDocuments()) items.add(mapOrderItem(d));
                 callback.success(items);
-            }).addOnFailureListener(e -> callback.error("Không tải được mặt hàng của đơn."));
-    }
-    @Override public void getOrder(String orderId,LifecycleCallback callback){
-        if(!network.isOnline()){callback.onError(ErrorCode.NETWORK,"Cần kết nối mạng để tải trạng thái đơn.");return;}
-        if (hasGuestAccess(orderId)) { getGuestOrder(orderId, callback); return; }
-        fetchLifecycle(clean(orderId),false,callback);
+            }).addOnFailureListener(e -> {
+                cacheExecutor.execute(() -> {
+                    OrderCacheEntity entity = orderDao.find(id);
+                    if (entity == null) entity = orderDao.findByCode(id);
+                    if (entity != null) {
+                        Order order = OrderCacheMapper.toDomain(entity);
+                        if (order.getItems() != null && !order.getItems().isEmpty()) {
+                            callback.success(order.getItems());
+                            return;
+                        }
+                    }
+                    callback.error("Không tải được mặt hàng của đơn.");
+                });
+            });
     }
 
+    @Override public void getOrder(String orderId, LifecycleCallback callback) {
+        String id = clean(orderId);
+        if (!network.isOnline()) {
+            loadCachedOrder(id, callback, "Đang ngoại tuyến và chưa có bản lưu cho đơn này.");
+            return;
+        }
+        if (hasGuestAccess(id)) { getGuestOrder(id, callback); return; }
+        fetchLifecycle(id, false, callback);
+    }
 
     private final Map<String, com.rescuefarm.service.realtime.BackendSnapshotWatch> guestWatches = new HashMap<>();
     private final Map<String, androidx.lifecycle.Observer<Long>> guestObservers = new HashMap<>();
@@ -304,6 +380,13 @@ public class FirebaseOrderRepository implements OrderRepository {
         String id = clean(orderId);
         if (id.isEmpty()) { callback.onError(ErrorCode.VALIDATION, "Mã đơn hàng không hợp lệ."); return; }
         stopObservingOrder(id);
+        loadCachedOrder(id, new LifecycleCallback() {
+            @Override public void onSuccess(Order order, Payment payment, Shipment shipment, boolean idempotentReplay) {
+                callback.onSuccess(order, payment, shipment, idempotentReplay);
+            }
+            @Override public void onError(ErrorCode error, String message) { }
+        }, "");
+        if (!network.isOnline()) return;
         if (hasGuestAccess(id)) {
             com.rescuefarm.service.realtime.BackendSnapshotWatch watch = new com.rescuefarm.service.realtime.BackendSnapshotWatch("guest_order");
             try { watch.configure("guest_order", new JSONObject().put("orderId", id).put("accessToken", guestSession.getOrderAccessToken(id))); }
@@ -399,19 +482,30 @@ public class FirebaseOrderRepository implements OrderRepository {
     }
 
     private void getGuestOrder(String orderId, LifecycleCallback callback) {
+        String id = clean(orderId);
+        if (!network.isOnline()) {
+            loadCachedOrder(id, callback, "Đang ngoại tuyến và chưa có bản lưu cho đơn này.");
+            return;
+        }
         try {
-            JSONObject request = new JSONObject().put("orderId", clean(orderId))
-                    .put("accessToken", guestSession.getOrderAccessToken(clean(orderId)));
+            JSONObject request = new JSONObject().put("orderId", id)
+                    .put("accessToken", guestSession.getOrderAccessToken(id));
             RenderBackendClient.postGuest("/guestOrderDetails", request, new RenderBackendClient.Callback() {
                 public void onSuccess(JSONObject response) {
                     try {
                         Order order = OrderJsonMapper.order(response.optJSONObject("order"));
                         Payment payment = OrderJsonMapper.payment(response.optJSONObject("payment"));
                         Shipment shipment = OrderJsonMapper.shipment(response.optJSONObject("shipment"));
-                        cache(order); callback.onSuccess(order, payment, shipment, false);
+                        cache(order, payment, shipment); callback.onSuccess(order, payment, shipment, false);
                     } catch (Exception invalid) { callback.onError(ErrorCode.UNKNOWN, "Không tải đủ thông tin đơn Guest."); }
                 }
-                public void onError(String message) { callback.onError(ErrorCode.FORBIDDEN, message); }
+                public void onError(String message) {
+                    if (!network.isOnline() || (message != null && (message.contains("kết nối") || message.contains("mạng") || message.contains("timeout")))) {
+                        loadCachedOrder(id, callback, message);
+                    } else {
+                        callback.onError(ErrorCode.FORBIDDEN, message);
+                    }
+                }
             });
         } catch (Exception invalid) { callback.onError(ErrorCode.VALIDATION, "Hãy tra cứu lại đơn Guest."); }
     }
@@ -506,6 +600,10 @@ public class FirebaseOrderRepository implements OrderRepository {
     }
 
     private void fetchLifecycle(String orderId,boolean replay,LifecycleCallback callback){
+        if (!network.isOnline()) {
+            loadCachedOrder(clean(orderId), callback, "Đang ngoại tuyến và chưa có bản lưu cho đơn này.");
+            return;
+        }
         db.collection(ORDERS).document(orderId).get().addOnSuccessListener(orderDoc->{
             if(!orderDoc.exists()){callback.onError(ErrorCode.NOT_FOUND,"Không tìm thấy đơn.");return;}
             db.collection(PAYMENTS).document(orderId).get().addOnSuccessListener(paymentDoc->{
@@ -514,14 +612,29 @@ public class FirebaseOrderRepository implements OrderRepository {
                     List<OrderItem> orderItems = new ArrayList<>();
                     for (DocumentSnapshot itemDoc : itemDocs.getDocuments()) orderItems.add(mapOrderItem(itemDoc));
                     Order order=mapOrder(orderDoc,orderItems);Payment payment=mapPayment(paymentDoc);
-                    cache(order);if(!lifecycle.requiresShipment(order.getFulfillmentType())){callback.onSuccess(order,payment,null,replay);return;}
+                    if(!lifecycle.requiresShipment(order.getFulfillmentType())){
+                        cache(order, payment, null);
+                        callback.onSuccess(order,payment,null,replay);
+                        return;
+                    }
                     db.collection(SHIPMENTS).document(orderId).get().addOnSuccessListener(shipmentDoc->{
                         if(!shipmentDoc.exists()){callback.onError(ErrorCode.CONFLICT,"Đơn giao hàng chưa có shipment record.");return;}
-                        callback.onSuccess(order,payment,mapShipment(shipmentDoc),replay);
-                    }).addOnFailureListener(e->failure(e,callback));
+                        Shipment shipment = mapShipment(shipmentDoc);
+                        cache(order, payment, shipment);
+                        callback.onSuccess(order,payment,shipment,replay);
+                    }).addOnFailureListener(e->{
+                        cache(order, payment, null);
+                        failure(e,callback);
+                    });
                 }).addOnFailureListener(e->failure(e,callback));
             }).addOnFailureListener(e->failure(e,callback));
-        }).addOnFailureListener(e->failure(e,callback));
+        }).addOnFailureListener(e->{
+            if (!network.isOnline()) {
+                loadCachedOrder(clean(orderId), callback, "Không tìm thấy đơn.");
+            } else {
+                failure(e,callback);
+            }
+        });
     }
 
     private void writeOrderNotification(com.google.firebase.firestore.Transaction tx, String orderId, String uid, OrderStatus status) {
@@ -553,8 +666,11 @@ public class FirebaseOrderRepository implements OrderRepository {
     private Map<String,Double> reservationMap(Object raw){Map<String,Double> result=new HashMap<>();if(raw instanceof Map<?,?>)for(Map.Entry<?,?> e:((Map<?,?>)raw).entrySet())if(e.getKey() instanceof String&&e.getValue() instanceof Number){double quantity=((Number)e.getValue()).doubleValue();if(quantity>0D)result.put((String)e.getKey(),quantity);}if(result.isEmpty())throw new IllegalStateException("RESERVATIONS_MISSING");return result;}
     private Order mapOrder(DocumentSnapshot d,List<OrderItem> items){return Order.restore(d.getId(),enumValue(OrderOwnerType.class,d.getString("ownerType"),OrderOwnerType.GUEST),d.getString("ownerId"),d.getString("orderCode"),d.getString("sellerId"),d.getString("campaignId"),enumValue(FulfillmentType.class,d.getString("fulfillmentType"),FulfillmentType.PICKUP),d.getString("receiverName"),d.getString("receiverPhone"),d.getString("receiverAddress"),number(d,"receiverLatitude"),number(d,"receiverLongitude"),number(d,"subtotal"),number(d,"quantityDiscount"),number(d,"shippingFee"),number(d,"totalAmount"),enumValue(PaymentMethod.class,d.getString("paymentMethod"),PaymentMethod.COD),enumValue(PaymentStatus.class,d.getString("paymentStatus"),PaymentStatus.UNPAID),enumValue(OrderStatus.class,d.getString("status"),OrderStatus.PENDING),d.getString("note"),date(d,"createdAt"),date(d,"updatedAt"),items)
         .withExpiryReview(Boolean.TRUE.equals(d.getBoolean("expiryReviewRequired")),d.getString("cancellationReason"));}
-    private void cache(Order value){if(value!=null)cacheExecutor.execute(()->orderDao.replaceOrder(
-            OrderCacheMapper.toEntity(value,System.currentTimeMillis())));}
+    private void cache(Order value){ cache(value, null, null); }
+    private void cache(Order value, Payment payment, Shipment shipment){
+        if(value!=null)cacheExecutor.execute(()->orderDao.replaceOrder(
+                OrderCacheMapper.toEntity(value, payment, shipment, System.currentTimeMillis())));
+    }
     private List<OrderCacheEntity> toEntities(List<Order> values){List<OrderCacheEntity> result=new ArrayList<>();
         long now=System.currentTimeMillis();for(Order value:values)result.add(OrderCacheMapper.toEntity(value,now));return result;}
     private void failure(Exception e,OrderCallback c){String m=e.getMessage();if("QUOTE_CHANGED".equals(m)){c.onError(ErrorCode.CONFLICT,"QUOTE_CHANGED: Giá sản phẩm hoặc phí giao hàng vừa thay đổi. Báo giá mới đã được tải; vui lòng kiểm tra và xác nhận lại.");return;}if("SELLER_BANK_DETAILS_MISSING".equals(m)){c.onError(ErrorCode.VALIDATION,"Seller chưa cấu hình đủ mã ngân hàng, tên chủ tài khoản và số tài khoản trong hồ sơ cửa hàng.");return;}if("SHIPPING_CONFIG_MISSING".equals(m)){c.onError(ErrorCode.VALIDATION,"Thiếu biểu phí giao hàng toàn hệ thống hoặc tọa độ GPS hợp lệ của Seller/địa chỉ nhận.");return;}if("SHIPPING_COORDINATES_MISSING".equals(m)){c.onError(ErrorCode.VALIDATION,"Thiếu tọa độ cửa hàng hoặc địa chỉ nhận hàng nên chưa thể tính phí theo km.");return;}if(m!=null&&(m.contains("Insufficient")||m.contains("unavailable")||m.contains("BATCH")||m.contains("PRODUCT"))){c.onError(ErrorCode.INSUFFICIENT_STOCK,"Tồn kho đã thay đổi hoặc batch không còn bán.");return;}if("CAMPAIGN_CONFLICT".equals(m)){c.onError(ErrorCode.CAMPAIGN_CONFLICT,"Nhận tại điểm giải cứu cần Campaign hợp lệ, cùng batch được phân bổ và còn đủ lượng khả dụng.");return;}if("IDEMPOTENCY_CONFLICT".equals(m)){c.onError(ErrorCode.CONFLICT,"Idempotency key đã được dùng cho request khác.");return;}if(e instanceof FirebaseFirestoreException&&((FirebaseFirestoreException)e).getCode()==FirebaseFirestoreException.Code.PERMISSION_DENIED){c.onError(ErrorCode.FORBIDDEN,"Firestore Rules từ chối checkout.");return;}c.onError(ErrorCode.UNKNOWN,"Không thể tạo đơn; transaction đã rollback.");}
