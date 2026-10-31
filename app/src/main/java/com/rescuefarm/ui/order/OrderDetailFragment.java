@@ -218,11 +218,18 @@ public class OrderDetailFragment extends Fragment {
     }
 
     private void render(OrderLifecycleState state) {
-        message.setText(state.getMessage());
-        message.setVisibility(state.getMessage() == null || state.getMessage().trim().isEmpty()
-                ? View.GONE : View.VISIBLE);
+        boolean isOffline = !new com.rescuefarm.service.network.AndroidNetworkStatusProvider(requireContext()).isOnline();
+        if (isOffline) {
+            message.setText("Đang xem bản lưu ngoại tuyến (Offline). Thông tin mới nhất sẽ tự động đồng bộ khi có kết nối mạng.");
+            message.setVisibility(View.VISIBLE);
+        } else {
+            message.setText(state.getMessage());
+            message.setVisibility(state.getMessage() == null || state.getMessage().trim().isEmpty() ? View.GONE : View.VISIBLE);
+        }
+
+
         boolean loading = state.getStatus() == OrderLifecycleState.Status.LOADING;
-        transitionButton.setEnabled(!loading); confirmButton.setEnabled(!loading); receiptButton.setEnabled(!loading);
+        transitionButton.setEnabled(!loading && !isOffline); confirmButton.setEnabled(!loading && !isOffline); receiptButton.setEnabled(!loading && !isOffline);
         if (state.getStatus() == OrderLifecycleState.Status.ERROR) {
             Toast.makeText(requireContext(), state.getMessage(), Toast.LENGTH_LONG).show(); return;
         }
