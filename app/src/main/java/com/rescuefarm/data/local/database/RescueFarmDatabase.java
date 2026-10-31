@@ -36,7 +36,7 @@ import com.rescuefarm.data.local.entity.OrderCacheEntity;
                 OrderCacheEntity.class,
                 com.rescuefarm.data.local.entity.CartMigrationEntity.class
         },
-        version = 11,
+        version = 12,
         exportSchema = true
 )
 public abstract class RescueFarmDatabase extends RoomDatabase {
@@ -117,6 +117,15 @@ public abstract class RescueFarmDatabase extends RoomDatabase {
             database.execSQL("CREATE TABLE IF NOT EXISTS cart_migration_outbox (id TEXT NOT NULL PRIMARY KEY, guestId TEXT, userId TEXT, payload TEXT)");
         }
     };
+
+    public static final Migration MIGRATION_11_12 = new Migration(11, 12) {
+        @Override public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE order_cache ADD COLUMN itemsSerialized TEXT");
+            database.execSQL("ALTER TABLE order_cache ADD COLUMN paymentSerialized TEXT");
+            database.execSQL("ALTER TABLE order_cache ADD COLUMN shipmentSerialized TEXT");
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_order_cache_orderCode ON order_cache (orderCode)");
+        }
+    };
     public abstract com.rescuefarm.data.local.dao.CartMigrationDao cartMigrationDao();
 
     public static RescueFarmDatabase getInstance(Context context) {
@@ -128,7 +137,7 @@ public abstract class RescueFarmDatabase extends RoomDatabase {
                             RescueFarmDatabase.class,
                             DATABASE_NAME
                     ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
-                            MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11).build();
+                            MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12).build();
                 }
             }
         }
